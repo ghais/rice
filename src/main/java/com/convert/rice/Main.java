@@ -29,7 +29,6 @@ public class Main {
                         .describedAs("HTTP port to start on");
                 accepts("protoPort").withRequiredArg().ofType(Integer.class).defaultsTo(10000)
                         .describedAs("Protobuf binary port to start on");
-                accepts("aggreg").withRequiredArg().describedAs("Aggregation Interval").defaultsTo("minute");
                 accepts("downSample").withRequiredArg().describedAs("The down sample interval can be h/m/d")
                         .defaultsTo("h");
                 acceptsAll(asList("h", "?"), "show help");
@@ -51,11 +50,11 @@ public class Main {
         } else if (options.valueOf("downSample").equals("h")) {
             supplier = new HourTimeSeriesSupplier(pool);
         }
-        if (options.hasArgument("httpPort")) {
+        if (options.has("httpPort")) {
             new RiceHttpServer((Integer) options.valueOf("httpPort"),
                     supplier).start();
         }
-        if (options.hasArgument("protoPort")) {
+        if (options.has("protoPort")) {
             new RiceProtoBufRpcServer((Integer) options.valueOf("protoPort"),
                     supplier).start();
         }
