@@ -28,6 +28,8 @@ public class DownSampleUtility {
 
     public static Instant downSample(Instant instant, DownSample downSample) {
         switch (downSample) {
+        case SECOND:
+            return new Instant(instant.getMillis() - instant.get(millisOfSecond()));
         case MINUTE:
             return new Instant(instant.getMillis() - instant.get(millisOfSecond())
                     - (1000 * instant.get(secondOfMinute())));
