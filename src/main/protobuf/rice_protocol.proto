@@ -2,6 +2,13 @@ package rice;
 option java_package = "com.convert.rice.protocol";
 option java_multiple_files = true;
 
+enum DownSample {
+	MINUTE = 0;
+	HOUR = 1;
+	DAY = 2;
+	MONTH = 3;
+}
+
 message Point {
 	required int64 timestamp = 1;
 	required int64 value = 2;
@@ -16,8 +23,9 @@ message Request {
 
 		required string type = 1;
 		required string key = 2;
-		repeated Metric metrics = 4;
-		optional int64 timestamp = 5;
+		repeated Metric metrics = 3;
+		optional int64 timestamp = 4;
+		optional DownSample down_sample = 5 [default = MINUTE];
 	}
 
 	message Get {
@@ -25,7 +33,6 @@ message Request {
 		required string key = 2;
 		required int64 start = 3;
 		required int64 end = 4;
-		repeated string metrics = 5;
 	}
 
 	message Create {

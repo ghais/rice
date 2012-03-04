@@ -3,7 +3,6 @@ package com.convert.rice.client;
 import static org.jboss.netty.channel.Channels.pipeline;
 
 import java.net.InetSocketAddress;
-import java.util.Collection;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Executors;
@@ -51,6 +50,10 @@ public class RiceClient {
     private final ClientBootstrap bootstrap;
 
     private final ChannelGroup group = new DefaultChannelGroup();
+
+    public RiceClient(final String host, final int port) {
+        this(host, port, new GenericObjectPool.Config());
+    }
 
     public RiceClient(final String host, final int port, GenericObjectPool.Config config) {
         bootstrap = new ClientBootstrap(
@@ -100,11 +103,10 @@ public class RiceClient {
 
     }
 
-    public ListenableFuture<GetResult> get(String type, String key, long start, long end, Collection<String> metrics)
-            throws Exception {
+    public ListenableFuture<GetResult> get(String type, String key, long start, long end) throws Exception {
         Channel ch = pool.borrowObject();
         RiceClientHandler handler = ch.getPipeline().get(RiceClientHandler.class);
-        return handler.get(type, key, start, end, metrics);
+        return handler.get(type, key, start, end);
 
     }
 
@@ -161,13 +163,12 @@ public class RiceClient {
 
         }
 
-        public ListenableFuture<GetResult> get(String type, String key, long start, long end, Collection<String> metrics) {
+        public ListenableFuture<GetResult> get(String type, String key, long start, long end) {
             Get.Builder builder = Get.newBuilder()
                     .setKey(key)
                     .setType(type)
                     .setStart(start)
-                    .setEnd(end)
-                    .addAllMetrics(metrics);
+                    .setEnd(end);
             SettableFuture<GetResult> future = SettableFuture.<GetResult> create();
             channel.getPipeline().getContext(this).setAttachment(future);
             channel.write(Request.newBuilder().setGet(builder));

@@ -1,5 +1,6 @@
 package com.convert.rice.server.protobuf;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static org.jboss.netty.channel.Channels.pipeline;
 
 import java.net.InetSocketAddress;
@@ -59,6 +60,7 @@ public class RiceProtoBufRpcServer extends AbstractService {
     private ServerBootstrap bootstrap;
 
     public RiceProtoBufRpcServer(int port, Supplier<TimeSeries> tsSupplier) {
+        checkNotNull(tsSupplier);
         this.port = port;
         // Configure the server.
         this.bootstrap = new ServerBootstrap(
@@ -134,7 +136,7 @@ public class RiceProtoBufRpcServer extends AbstractService {
                     for (Metric metric : inc.getMetricsList()) {
                         metrics.put(metric.getKey(), metric.getValue());
                     }
-                    timeSeries.inc(inc.getType(), inc.getKey(), timestamp, metrics);
+                    timeSeries.inc(inc.getType(), inc.getKey(), timestamp, metrics, inc.getDownSample());
                     builder.setKey(inc.getKey()).setType(inc.getType()).setTimestamp(inc.getTimestamp()).build();
                 } finally {
                     e.getChannel().write(Response.newBuilder().setIncResult(builder))
@@ -156,7 +158,7 @@ public class RiceProtoBufRpcServer extends AbstractService {
                     builder.setType(get.getType());
 
                     Collection<DataPoints> dataPoints = timeSeries.get(get.getType(), get.getKey(),
-                            new Interval(get.getStart(), get.getEnd()), get.getMetricsList());
+                            new Interval(get.getStart(), get.getEnd()));
                     for (DataPoints dps : dataPoints) {
                         GetResult.Metric.Builder metricBuilder = GetResult.Metric.newBuilder().setName(
                                 dps.getMetricName());
@@ -197,12 +199,17 @@ public class RiceProtoBufRpcServer extends AbstractService {
 
     @Override
     protected void doStart() {
-        this.run();
-
+        try {
+            this.run();
+            this.notifyStarted();
+        } catch (Throwable t) {
+            this.notifyFailed(t);
+        }
     }
 
     @Override
     protected void doStop() {
         bootstrap.releaseExternalResources();
+        this.notifyStopped();
     }
 }
