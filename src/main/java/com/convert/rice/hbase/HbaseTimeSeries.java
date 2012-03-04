@@ -1,15 +1,13 @@
 package com.convert.rice.hbase;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.Maps.newHashMap;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.UUID;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -24,8 +22,6 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.joda.time.Instant;
 import org.joda.time.Interval;
-import org.joda.time.Period;
-import org.joda.time.PeriodType;
 
 import com.convert.rice.DataPoint;
 import com.convert.rice.DataPoints;
@@ -37,14 +33,14 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 
-public class HbaseTimeSeries implements TimeSeries {
+public class HBaseTimeSeries implements TimeSeries {
+
+    private static final int SCANNER_CACHING = new Integer(System.getProperty("scannerCaching", "1000"));
 
     /**
-     * 
+     * The default column family.
      */
-    private static final int DEFAULT_CACHING = 60 * 24;
-
-    public static final byte[] DEFAULT_FAMILY = new byte[] { 'v' };
+    public static final byte[] CF = new byte[] { 'v' };
 
     private final HTablePool pool;
 
@@ -53,12 +49,8 @@ public class HbaseTimeSeries implements TimeSeries {
      * 
      * @param hTable
      */
-    public HbaseTimeSeries(HTablePool pool) {
+    public HBaseTimeSeries(HTablePool pool) {
         this.pool = pool;
-    }
-
-    public void inc(String type, String key, Map<String, Long> dps) throws IOException {
-        this.inc(type, key, new Instant(), dps);
     }
 
     @Override
@@ -72,7 +64,7 @@ public class HbaseTimeSeries implements TimeSeries {
 
         Increment inc = new Increment(entryKey);
         for (Entry<String, Long> entry : dps.entrySet()) {
-            inc.addColumn(DEFAULT_FAMILY, Bytes.toBytes(entry.getKey()), entry.getValue());
+            inc.addColumn(CF, Bytes.toBytes(entry.getKey()), entry.getValue());
         }
         HTableInterface hTable = pool.getTable(type);
         try {
@@ -83,24 +75,22 @@ public class HbaseTimeSeries implements TimeSeries {
     }
 
     /**
-     * 
+     * @param type
      * @param key
      * @param interval
      * @return
      * @throws IOException
      */
     @Override
-    public Collection<DataPoints> get(String type, String key, Interval interval) throws IOException {
-        Period period = interval.toPeriod(PeriodType.hours());
+    public Map<String, DataPoints> get(String type, String key, Interval interval) throws IOException {
         ListMultimap<String, DataPoint> dps = ArrayListMultimap.<String, DataPoint> create();
-
         Instant start = interval.getStart().toInstant();
         Instant end = interval.getEnd().toInstant();
         byte[] startRow = getRowKey(key, start);
         byte[] endRow = getRowKey(key, end);
         Scan scan = new Scan(startRow, endRow);
-        scan.addFamily(DEFAULT_FAMILY);
-        scan.setCaching(Math.min(DEFAULT_CACHING, period.getMinutes()));
+        scan.addFamily(CF);
+        scan.setCaching(SCANNER_CACHING);
         ResultScanner results = null;
         HTableInterface hTable = pool.getTable(type);
         try {
@@ -121,15 +111,16 @@ public class HbaseTimeSeries implements TimeSeries {
                 }
             }
         }
-        List<DataPoints> result = new ArrayList<DataPoints>(dps.size());
+        Map<String, DataPoints> result = newHashMap();
         for (String metric : dps.keySet()) {
-            result.add(new WritableDataPoints(key, metric, dps.get(metric)));
+            result.put(metric, new WritableDataPoints(key, metric, dps.get(metric)));
         }
         return result;
     }
 
     @VisibleForTesting
     Instant getInstant(byte[] rowKey, String metricKey) {
+        checkArgument(rowKey.length == metricKey.length() + 1 + 8); // rowKey + : + timestamp.
         long millis = Bytes.toLong(Arrays.copyOfRange(rowKey, metricKey.length() + 1, rowKey.length));
         return new Instant(millis);
     }
@@ -148,17 +139,17 @@ public class HbaseTimeSeries implements TimeSeries {
         return rowKey;
     }
 
-    public boolean checkOrCreateTable(HBaseAdmin admin, String type, String... metrics) throws IOException {
+    public boolean checkOrCreateTable(HBaseAdmin admin, String type) throws IOException {
         if (!admin.tableExists(Bytes.toBytes(type))) {
             HTableDescriptor descriptor = new HTableDescriptor(Bytes.toBytes(type));
-            descriptor.addFamily(new HColumnDescriptor(DEFAULT_FAMILY));
+            descriptor.addFamily(new HColumnDescriptor(CF));
             admin.createTable(descriptor);
             return true;
         } else {
             HTableDescriptor descriptor = admin.getTableDescriptor(toBytes(type));
             boolean modifyRequired = false;
-            if (null == descriptor.getFamily(DEFAULT_FAMILY)) {
-                descriptor.addFamily(new HColumnDescriptor(DEFAULT_FAMILY));
+            if (null == descriptor.getFamily(CF)) {
+                descriptor.addFamily(new HColumnDescriptor(CF));
                 modifyRequired = true;
             }
             if (modifyRequired) {
@@ -172,12 +163,9 @@ public class HbaseTimeSeries implements TimeSeries {
         }
     }
 
-    public static void main(String[] args) throws IOException {
-        HbaseTimeSeries ts = new HbaseTimeSeries(new HTablePool());
-        Instant date = new Instant();
-        System.out.println(date);
-        byte[] rowKey = ts.getRowKey(UUID.randomUUID().toString(), date);
-        System.out.println(new String(rowKey));
-        System.out.println(ts.getInstant(rowKey, UUID.randomUUID().toString()));
+    public void deleteTable(HBaseAdmin admin, String type) throws IOException {
+        admin.disableTable(type);
+        admin.deleteTable(type);
     }
+
 }

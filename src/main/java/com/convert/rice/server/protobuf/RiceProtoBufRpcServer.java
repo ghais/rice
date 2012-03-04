@@ -4,7 +4,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static org.jboss.netty.channel.Channels.pipeline;
 
 import java.net.InetSocketAddress;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -157,9 +156,9 @@ public class RiceProtoBufRpcServer extends AbstractService {
                     builder.setKey(get.getKey());
                     builder.setType(get.getType());
 
-                    Collection<DataPoints> dataPoints = timeSeries.get(get.getType(), get.getKey(),
+                    Map<String, DataPoints> dataPoints = timeSeries.get(get.getType(), get.getKey(),
                             new Interval(get.getStart(), get.getEnd()));
-                    for (DataPoints dps : dataPoints) {
+                    for (DataPoints dps : dataPoints.values()) {
                         GetResult.Metric.Builder metricBuilder = GetResult.Metric.newBuilder().setName(
                                 dps.getMetricName());
                         for (DataPoint dp : dps) {

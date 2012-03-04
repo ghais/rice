@@ -11,7 +11,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.client.HTablePool;
 
-import com.convert.rice.hbase.HbaseTimeSeries;
+import com.convert.rice.hbase.HBaseTimeSeries;
 import com.convert.rice.server.protobuf.RiceProtoBufRpcServer;
 import com.google.common.base.Supplier;
 
@@ -53,7 +53,7 @@ public class Main {
 
         @Override
         public TimeSeries get() {
-            return new HbaseTimeSeries(pool);
+            return new HBaseTimeSeries(pool);
         }
     }
 
