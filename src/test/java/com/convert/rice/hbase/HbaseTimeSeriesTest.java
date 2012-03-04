@@ -36,10 +36,10 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.convert.rice.AggregationUtility;
 import com.convert.rice.DataPoint;
 import com.convert.rice.DataPoints;
-import com.convert.rice.DownSampleUtility;
-import com.convert.rice.protocol.DownSample;
+import com.convert.rice.protocol.Aggregation;
 import com.google.common.collect.Lists;
 
 /**
@@ -80,7 +80,7 @@ public class HbaseTimeSeriesTest {
     public void testInc_1() throws IOException {
         String key = UUID.randomUUID().toString();
         Instant instant = new Instant();
-        Instant downSampled = DownSampleUtility.downSample(instant, DownSample.MINUTE);
+        Instant aggregatedInstant = AggregationUtility.aggregateTo(instant, Aggregation.MINUTE);
         Map<String, Long> dps = new HashMap<String, Long>() {
 
             private static final long serialVersionUID = -8468159673993092578L;
@@ -91,13 +91,13 @@ public class HbaseTimeSeriesTest {
             }
         };
         HBaseTimeSeries ts = new HBaseTimeSeries(pool);
-        ts.inc(type, key, instant.getMillis(), dps, DownSample.MINUTE);
+        ts.inc(type, key, instant.getMillis(), dps, Aggregation.MINUTE);
 
         HTableInterface table = pool.getTable(type);
         try {
-            Get get = new Get(ts.getRowKey(key, downSampled));
+            Get get = new Get(ts.getRowKey(key, aggregatedInstant));
             Result r = table.get(get);
-            assertEquals(downSampled, ts.getInstant(r.getRow(), key));
+            assertEquals(aggregatedInstant, ts.getInstant(r.getRow(), key));
             assertEquals(1L, toLong(r.getValue(CF, toBytes("a"))));
             assertEquals(2L, toLong(r.getValue(CF, toBytes("b"))));
         } finally {
@@ -119,7 +119,7 @@ public class HbaseTimeSeriesTest {
         };
         HBaseTimeSeries ts = new HBaseTimeSeries(pool);
         for (int i = 1000; i <= 100000; i += 1000) {
-            ts.inc(type, key, i, dps, DownSample.SECOND);
+            ts.inc(type, key, i, dps, Aggregation.SECOND);
         }
 
         HTableInterface table = pool.getTable(type);
@@ -156,8 +156,8 @@ public class HbaseTimeSeriesTest {
         };
         HBaseTimeSeries ts = new HBaseTimeSeries(pool);
         for (int i = 1000; i <= 100000; i += 1000) {
-            ts.inc(type, key, i, dps, DownSample.SECOND);
-            ts.inc(type, key, i, dps, DownSample.SECOND);
+            ts.inc(type, key, i, dps, Aggregation.SECOND);
+            ts.inc(type, key, i, dps, Aggregation.SECOND);
         }
 
         HTableInterface table = pool.getTable(type);

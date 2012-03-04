@@ -23,12 +23,12 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.joda.time.Instant;
 import org.joda.time.Interval;
 
+import com.convert.rice.AggregationUtility;
 import com.convert.rice.DataPoint;
 import com.convert.rice.DataPoints;
-import com.convert.rice.DownSampleUtility;
 import com.convert.rice.TimeSeries;
 import com.convert.rice.WritableDataPoints;
-import com.convert.rice.protocol.DownSample;
+import com.convert.rice.protocol.Aggregation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
@@ -54,9 +54,9 @@ public class HBaseTimeSeries implements TimeSeries {
     }
 
     @Override
-    public void inc(String type, String key, long timestamp, Map<String, Long> dps, DownSample downSample)
+    public void inc(String type, String key, long timestamp, Map<String, Long> dps, Aggregation aggregation)
             throws IOException {
-        this.inc(type, key, DownSampleUtility.downSample(new Instant(timestamp), downSample), dps);
+        this.inc(type, key, AggregationUtility.aggregateTo(new Instant(timestamp), aggregation), dps);
     }
 
     public void inc(String type, String key, Instant timeStamp, Map<String, Long> dps) throws IOException {

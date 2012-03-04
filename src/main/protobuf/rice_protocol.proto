@@ -2,7 +2,7 @@ package rice;
 option java_package = "com.convert.rice.protocol";
 option java_multiple_files = true;
 
-enum DownSample {
+enum Aggregation {
 	SECOND = 0;
 	MINUTE = 1;
 	HOUR = 2;
@@ -26,7 +26,7 @@ message Request {
 		required string key = 2;
 		repeated Metric metrics = 3;
 		optional int64 timestamp = 4;
-		optional DownSample down_sample = 5 [default = MINUTE];
+		optional Aggregation down_sample = 5 [default = MINUTE];
 	}
 
 	message Get {

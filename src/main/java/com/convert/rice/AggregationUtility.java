@@ -14,20 +14,20 @@ import static org.joda.time.DateTimeFieldType.secondOfMinute;
 
 import org.joda.time.Instant;
 
-import com.convert.rice.protocol.DownSample;
+import com.convert.rice.protocol.Aggregation;
 
 /**
  * @author Ghais Issa <ghais.issa@convertglobal.com>
  * 
  */
-public class DownSampleUtility {
+public class AggregationUtility {
 
     static long MILLIS_IN_DAY = 24 * 60 * 60 * 1000;
 
     static long MILLIS_IN_MINUTE = 60 * 1000;
 
-    public static Instant downSample(Instant instant, DownSample downSample) {
-        switch (downSample) {
+    public static Instant aggregateTo(Instant instant, Aggregation aggregation) {
+        switch (aggregation) {
         case SECOND:
             return new Instant(instant.getMillis() - instant.get(millisOfSecond()));
         case MINUTE:
