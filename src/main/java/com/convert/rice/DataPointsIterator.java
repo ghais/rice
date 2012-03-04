@@ -71,12 +71,32 @@ public class DataPointsIterator implements SeekableView {
 
     }
 
+    /**
+     * Get the timestamp at the current index.
+     * 
+     * @return The value at the current index.
+     * @throws NoSuchElementException
+     *             if the are no more data points.
+     */
     public long timestamp() {
-        return dataPoints.timestamp(index);
+        if (hasNext()) {
+            return dataPoints.timestamp(index);
+        }
+        throw new NoSuchElementException("no more elements in " + this);
     }
 
+    /**
+     * Get the value at the current index.
+     * 
+     * @return The value at the current index.
+     * @throws NoSuchElementException
+     *             if there are no more data points.
+     */
     public long value() {
-        return dataPoints.get(index).getValue();
+        if (hasNext()) {
+            return dataPoints.get(index).getValue();
+        }
+        throw new NoSuchElementException("no more elements in " + this);
     }
 
 }
