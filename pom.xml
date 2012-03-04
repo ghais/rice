@@ -11,6 +11,16 @@
     <url>scm:git:git@github.com:ghais/rice.git</url>
     <developerConnection>scm:git:git@github.com:ghais/rice.git</developerConnection>
   </scm>
+  <distributionManagement>
+    <repository>
+      <id>repo</id>
+      <url>https://github.com/ghais/mvnrepo/raw/master/releases</url>
+    </repository>
+    <snapshotRepository>
+      <id>snapshot-repo</id>
+      <url>https://github.com/ghais/mvnrepo/raw/master/snapshots</url>
+    </snapshotRepository>
+  </distributionManagement>
   <repositories>
     <repository>
       <id>cloudera</id>
@@ -19,6 +29,12 @@
     </repository>
   </repositories>
   <dependencies>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
+      <version>1.6.1</version>
+      <scope>compile</scope>
+    </dependency>
     <dependency>
       <groupId>commons-pool</groupId>
       <artifactId>commons-pool</artifactId>
@@ -70,6 +86,19 @@
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>4.8.2</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hbase</groupId>
+      <artifactId>hbase</artifactId>
+      <version>0.90.4-cdh3u3</version>
+      <classifier>tests</classifier> 
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-test</artifactId>
+      <version>0.20.2-cdh3u3</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
