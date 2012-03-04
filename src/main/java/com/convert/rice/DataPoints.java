@@ -40,6 +40,8 @@ public interface DataPoints extends Iterable<DataPoint> {
      * timestamp(i) &lt; timestamp(i + 1)
      * </pre>
      * 
+     * @param i
+     *            index for the {@code i}th data point.
      * @return A strictly positive integer.
      * @throws IndexOutOfBoundsException
      *             if {@code i} is not in the range <code>[0, {@link #size} - 1]</code>
@@ -47,8 +49,12 @@ public interface DataPoints extends Iterable<DataPoint> {
     long timestamp(int i);
 
     /**
-     * Returns the value of the {@code i}th data point as a long. The first data point has index 0.
+     * @param i
+     *            an index for the {@code i}th element.
+     * @return The value of the {@code i}th data point as a long. The first data point has index 0.
      * 
+     * @throws IndexOutOfBoundsException
+     *             if {@code i} is not in the range <code>[0, {@link #size} - 1]</code>
      */
     DataPoint get(int i);
 
