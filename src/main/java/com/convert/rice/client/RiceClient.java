@@ -32,6 +32,7 @@ import org.jboss.netty.handler.codec.protobuf.ProtobufVarint32FrameDecoder;
 import org.jboss.netty.handler.codec.protobuf.ProtobufVarint32LengthFieldPrepender;
 import org.jboss.netty.handler.logging.LoggingHandler;
 
+import com.convert.rice.protocol.Aggregation;
 import com.convert.rice.protocol.Request;
 import com.convert.rice.protocol.Request.Get;
 import com.convert.rice.protocol.Request.Increment;
@@ -94,12 +95,13 @@ public class RiceClient {
         }, config);
     }
 
-    public ListenableFuture<IncResult> inc(String type, String key, Map<String, Long> metrics, long timestamp)
+    public ListenableFuture<IncResult> inc(String type, String key, Map<String, Long> metrics, long timestamp,
+            Aggregation aggregation)
             throws Exception {
         Channel ch = pool.borrowObject();
 
         RiceClientHandler handler = ch.getPipeline().get(RiceClientHandler.class);
-        return handler.inc(type, key, timestamp, metrics);
+        return handler.inc(type, key, timestamp, metrics, aggregation);
 
     }
 
@@ -149,9 +151,11 @@ public class RiceClient {
         // Stateful properties
         private volatile Channel channel;
 
-        public SettableFuture<IncResult> inc(String type, String key, long timestamp, Map<String, Long> metrics) {
+        public SettableFuture<IncResult> inc(String type, String key, long timestamp, Map<String, Long> metrics,
+                Aggregation aggregation) {
             Builder builder = Increment.newBuilder().setType(type)
                     .setKey(key)
+                    .setAggregation(aggregation)
                     .setTimestamp(timestamp);
             for (Entry<String, Long> entry : metrics.entrySet()) {
                 builder.addMetrics(Metric.newBuilder().setKey(entry.getKey()).setValue(entry.getValue()));

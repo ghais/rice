@@ -26,7 +26,7 @@ message Request {
 		required string key = 2;
 		repeated Metric metrics = 3;
 		optional int64 timestamp = 4;
-		optional Aggregation down_sample = 5 [default = MINUTE];
+		optional Aggregation aggregation = 5 [default = MINUTE];
 	}
 
 	message Get {

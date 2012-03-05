@@ -135,7 +135,7 @@ public class RiceProtoBufRpcServer extends AbstractService {
                     for (Metric metric : inc.getMetricsList()) {
                         metrics.put(metric.getKey(), metric.getValue());
                     }
-                    timeSeries.inc(inc.getType(), inc.getKey(), timestamp, metrics, inc.getDownSample());
+                    timeSeries.inc(inc.getType(), inc.getKey(), timestamp, metrics, inc.getAggregation());
                     builder.setKey(inc.getKey()).setType(inc.getType()).setTimestamp(inc.getTimestamp()).build();
                 } finally {
                     e.getChannel().write(Response.newBuilder().setIncResult(builder))
