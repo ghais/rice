@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.convert</groupId>
   <artifactId>rice</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0-SNAPSHOT</version>
   <name>rice</name>
   <description>An analytics tool</description>
   <url>http://github.com/ghais/rice</url>
