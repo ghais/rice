@@ -1,6 +1,7 @@
 package com.convert.rice.hbase;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Maps.newHashMap;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
@@ -44,22 +45,29 @@ public class HBaseTimeSeries implements TimeSeries {
 
     private final HTablePool pool;
 
+    private final Aggregation aggregation;
+
     /**
      * The HTable associated with the metric type.
      * 
      * @param hTable
      */
     public HBaseTimeSeries(HTablePool pool) {
-        this.pool = pool;
+        this(pool, Aggregation.HOUR);
+    }
+
+    public HBaseTimeSeries(HTablePool pool, Aggregation aggregation) {
+        this.aggregation = checkNotNull(aggregation);
+        this.pool = checkNotNull(pool);
     }
 
     @Override
-    public void inc(String type, String key, long timestamp, Map<String, Long> dps, Aggregation aggregation)
-            throws IOException {
-        this.inc(type, key, AggregationUtility.aggregateTo(new Instant(timestamp), aggregation), dps);
+    public void inc(String type, String key, long timestamp, Map<String, Long> dps) throws IOException {
+        this.inc(type, key, new Instant(timestamp), dps);
     }
 
-    public void inc(String type, String key, Instant timeStamp, Map<String, Long> dps) throws IOException {
+    public void inc(String type, String key, Instant instant, Map<String, Long> dps) throws IOException {
+        Instant timeStamp = AggregationUtility.aggregateTo(instant, this.aggregation);
         byte[] entryKey = getRowKey(key, timeStamp);
 
         Increment inc = new Increment(entryKey);

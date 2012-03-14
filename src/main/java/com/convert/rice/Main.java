@@ -39,7 +39,7 @@ public class Main {
             System.exit(0);
         }
 
-        new RiceProtoBufRpcServer((Integer) options.valueOf("protoPort"), supplier).start();
+        new RiceProtoBufRpcServer((Integer) options.valueOf("port"), supplier).start();
 
     }
 

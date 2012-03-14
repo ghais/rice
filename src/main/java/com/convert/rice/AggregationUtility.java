@@ -26,6 +26,10 @@ public class AggregationUtility {
 
     static long MILLIS_IN_MINUTE = 60 * 1000;
 
+    public static Instant aggregateTo(long timestamp, Aggregation aggregation) {
+        return aggregateTo(new Instant(timestamp), aggregation);
+    }
+
     public static Instant aggregateTo(Instant instant, Aggregation aggregation) {
         switch (aggregation) {
         case SECOND:
@@ -33,6 +37,7 @@ public class AggregationUtility {
         case MINUTE:
             return new Instant(instant.getMillis() - instant.get(millisOfSecond())
                     - (1000 * instant.get(secondOfMinute())));
+
         case HOUR:
             return new Instant(instant.getMillis() - instant.get(millisOfSecond())
                     - (1000 * instant.get(secondOfMinute()))
@@ -48,4 +53,5 @@ public class AggregationUtility {
             throw new IllegalStateException();
         }
     }
+
 }

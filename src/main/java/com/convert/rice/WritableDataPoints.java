@@ -5,9 +5,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import org.apache.commons.lang.StringUtils;
 
+import com.convert.rice.protocol.Aggregation;
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
 
@@ -19,12 +22,24 @@ public class WritableDataPoints implements DataPoints {
 
     private final List<DataPoint> dataPoints;
 
-    public WritableDataPoints(String key, String metricName, List<DataPoint> dataPoints) {
+    /**
+     * Constructor.
+     * 
+     * @param key
+     * @param metricName
+     * @param dps
+     */
+    public WritableDataPoints(String key, String metricName, List<DataPoint> dps) {
         this.key = checkNotNull(key, "key");
         this.metricName = checkNotNull(metricName, "metric name");
-        this.dataPoints = checkNotNull(dataPoints);
+        this.dataPoints = checkNotNull(dps, "data points");
     }
 
+    /**
+     * 
+     * @param key
+     * @param metricName
+     */
     public WritableDataPoints(String key, String metricName) {
         this(key, metricName, new ArrayList<DataPoint>());
     }
@@ -55,9 +70,11 @@ public class WritableDataPoints implements DataPoints {
     }
 
     /**
-     * Assumes that the dp.timestamp
+     * add a datapoint to the datapoints.
      * 
      * @param dp
+     * @throws IllegalArgumentException
+     *             if the data point's timestamp is less than the last datapoint.
      */
     public void add(DataPoint dp) {
         if (this.dataPoints.isEmpty()) {
@@ -104,5 +121,20 @@ public class WritableDataPoints implements DataPoints {
     @Override
     public String getKey() {
         return key;
+    }
+
+    @Override
+    public SortedMap<Long, Long> aggregate(Aggregation aggregation) {
+        SortedMap<Long, Long> values = new TreeMap<Long, Long>();
+        for (DataPoint dp : this) {
+            Long ts = AggregationUtility.aggregateTo(dp.getTimestamp(), aggregation).getMillis();
+            Long v = dp.getValue();
+            if (values.containsKey(ts)) {
+                values.put(ts, values.get(ts) + v);
+            } else {
+                values.put(ts, v);
+            }
+        }
+        return values;
     }
 }

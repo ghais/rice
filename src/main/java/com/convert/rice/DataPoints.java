@@ -6,6 +6,10 @@
  */
 package com.convert.rice;
 
+import java.util.SortedMap;
+
+import com.convert.rice.protocol.Aggregation;
+
 public interface DataPoints extends Iterable<DataPoint> {
 
     /**
@@ -65,5 +69,12 @@ public interface DataPoints extends Iterable<DataPoint> {
      * @return
      */
     String toJson();
+
+    /**
+     * Get the view as a sorted map based on the given aggregation.
+     * 
+     * @return map from timestamp to values aggregated according to the given aggregator.
+     */
+    SortedMap<Long, Long> aggregate(Aggregation agg);
 
 }

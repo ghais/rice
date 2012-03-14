@@ -95,20 +95,20 @@ public class RiceClient {
         }, config);
     }
 
-    public ListenableFuture<IncResult> inc(String type, String key, Map<String, Long> metrics, long timestamp,
-            Aggregation aggregation)
+    public ListenableFuture<IncResult> inc(String type, String key, Map<String, Long> metrics, long timestamp)
             throws Exception {
         Channel ch = pool.borrowObject();
 
         RiceClientHandler handler = ch.getPipeline().get(RiceClientHandler.class);
-        return handler.inc(type, key, timestamp, metrics, aggregation);
+        return handler.inc(type, key, timestamp, metrics);
 
     }
 
-    public ListenableFuture<GetResult> get(String type, String key, long start, long end) throws Exception {
+    public ListenableFuture<GetResult> get(String type, String key, long start, long end, Aggregation aggregation)
+            throws Exception {
         Channel ch = pool.borrowObject();
         RiceClientHandler handler = ch.getPipeline().get(RiceClientHandler.class);
-        return handler.get(type, key, start, end);
+        return handler.get(type, key, start, end, aggregation);
 
     }
 
@@ -151,11 +151,9 @@ public class RiceClient {
         // Stateful properties
         private volatile Channel channel;
 
-        public SettableFuture<IncResult> inc(String type, String key, long timestamp, Map<String, Long> metrics,
-                Aggregation aggregation) {
+        public SettableFuture<IncResult> inc(String type, String key, long timestamp, Map<String, Long> metrics) {
             Builder builder = Increment.newBuilder().setType(type)
                     .setKey(key)
-                    .setAggregation(aggregation)
                     .setTimestamp(timestamp);
             for (Entry<String, Long> entry : metrics.entrySet()) {
                 builder.addMetrics(Metric.newBuilder().setKey(entry.getKey()).setValue(entry.getValue()));
@@ -167,12 +165,13 @@ public class RiceClient {
 
         }
 
-        public ListenableFuture<GetResult> get(String type, String key, long start, long end) {
+        public ListenableFuture<GetResult> get(String type, String key, long start, long end, Aggregation aggregation) {
             Get.Builder builder = Get.newBuilder()
                     .setKey(key)
                     .setType(type)
                     .setStart(start)
-                    .setEnd(end);
+                    .setEnd(end)
+                    .setAggregation(aggregation);
             SettableFuture<GetResult> future = SettableFuture.<GetResult> create();
             channel.getPipeline().getContext(this).setAttachment(future);
             channel.write(Request.newBuilder().setGet(builder));

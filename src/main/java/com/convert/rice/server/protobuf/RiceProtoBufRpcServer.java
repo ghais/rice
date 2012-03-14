@@ -6,6 +6,7 @@ import static org.jboss.netty.channel.Channels.pipeline;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -29,7 +30,6 @@ import org.jboss.netty.handler.codec.protobuf.ProtobufVarint32FrameDecoder;
 import org.jboss.netty.handler.codec.protobuf.ProtobufVarint32LengthFieldPrepender;
 import org.joda.time.Interval;
 
-import com.convert.rice.DataPoint;
 import com.convert.rice.DataPoints;
 import com.convert.rice.TimeSeries;
 import com.convert.rice.protocol.Point;
@@ -135,7 +135,7 @@ public class RiceProtoBufRpcServer extends AbstractService {
                     for (Metric metric : inc.getMetricsList()) {
                         metrics.put(metric.getKey(), metric.getValue());
                     }
-                    timeSeries.inc(inc.getType(), inc.getKey(), timestamp, metrics, inc.getAggregation());
+                    timeSeries.inc(inc.getType(), inc.getKey(), timestamp, metrics);
                     builder.setKey(inc.getKey()).setType(inc.getType()).setTimestamp(inc.getTimestamp()).build();
                 } finally {
                     e.getChannel().write(Response.newBuilder().setIncResult(builder))
@@ -161,8 +161,8 @@ public class RiceProtoBufRpcServer extends AbstractService {
                     for (DataPoints dps : dataPoints.values()) {
                         GetResult.Metric.Builder metricBuilder = GetResult.Metric.newBuilder().setName(
                                 dps.getMetricName());
-                        for (DataPoint dp : dps) {
-                            metricBuilder.addPoints(Point.newBuilder().setTimestamp(dp.getTimestamp())
+                        for (Entry<Long, Long> dp : dps.aggregate(get.getAggregation()).entrySet()) {
+                            metricBuilder.addPoints(Point.newBuilder().setTimestamp(dp.getKey())
                                     .setValue(dp.getValue()));
                         }
                         builder.addMetrics(metricBuilder);

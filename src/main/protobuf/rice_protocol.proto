@@ -3,11 +3,11 @@ option java_package = "com.convert.rice.protocol";
 option java_multiple_files = true;
 
 enum Aggregation {
-	SECOND = 0;
-	MINUTE = 1;
-	HOUR = 2;
-	DAY = 3;
-	MONTH = 4;
+	SECOND = 1;
+	MINUTE = 2;
+	HOUR   = 3;
+	DAY    = 4;
+	MONTH  = 5;
 }
 
 message Point {
@@ -26,7 +26,6 @@ message Request {
 		required string key = 2;
 		repeated Metric metrics = 3;
 		optional int64 timestamp = 4;
-		optional Aggregation aggregation = 5 [default = MINUTE];
 	}
 
 	message Get {
@@ -34,6 +33,8 @@ message Request {
 		required string key = 2;
 		required int64 start = 3;
 		required int64 end = 4;
+		optional Aggregation aggregation = 5 [default = HOUR];
+
 	}
 
 	message Create {

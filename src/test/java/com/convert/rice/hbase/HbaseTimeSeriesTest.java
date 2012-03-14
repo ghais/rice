@@ -90,8 +90,8 @@ public class HbaseTimeSeriesTest {
                 put("b", 2L);
             }
         };
-        HBaseTimeSeries ts = new HBaseTimeSeries(pool);
-        ts.inc(type, key, instant.getMillis(), dps, Aggregation.MINUTE);
+        HBaseTimeSeries ts = new HBaseTimeSeries(pool, Aggregation.MINUTE);
+        ts.inc(type, key, instant.getMillis(), dps);
 
         HTableInterface table = pool.getTable(type);
         try {
@@ -117,9 +117,9 @@ public class HbaseTimeSeriesTest {
                 put("b", 2L);
             }
         };
-        HBaseTimeSeries ts = new HBaseTimeSeries(pool);
+        HBaseTimeSeries ts = new HBaseTimeSeries(pool, Aggregation.SECOND);
         for (int i = 1000; i <= 100000; i += 1000) {
-            ts.inc(type, key, i, dps, Aggregation.SECOND);
+            ts.inc(type, key, i, dps);
         }
 
         HTableInterface table = pool.getTable(type);
@@ -154,10 +154,10 @@ public class HbaseTimeSeriesTest {
                 put("b", 2L);
             }
         };
-        HBaseTimeSeries ts = new HBaseTimeSeries(pool);
+        HBaseTimeSeries ts = new HBaseTimeSeries(pool, Aggregation.SECOND);
         for (int i = 1000; i <= 100000; i += 1000) {
-            ts.inc(type, key, i, dps, Aggregation.SECOND);
-            ts.inc(type, key, i, dps, Aggregation.SECOND);
+            ts.inc(type, key, i, dps);
+            ts.inc(type, key, i, dps);
         }
 
         HTableInterface table = pool.getTable(type);

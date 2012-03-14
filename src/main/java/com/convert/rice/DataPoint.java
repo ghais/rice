@@ -1,6 +1,6 @@
 package com.convert.rice;
 
-public class DataPoint {
+public class DataPoint implements Comparable<DataPoint> {
 
     private final long value;
 
@@ -54,6 +54,21 @@ public class DataPoint {
             return false;
         }
         return true;
+    }
+
+    @Override
+    public int compareTo(DataPoint dp) {
+        if (this.getTimestamp() < dp.getTimestamp()) {
+            return -1;
+        } else if (this.getTimestamp() > dp.getTimestamp()) {
+            return 1;
+        } else if (this.getValue() < dp.getValue()) {
+            return -1;
+        } else if (this.getValue() > dp.getValue()) {
+            return 1;
+        } else {
+            return 0;
+        }
     }
 
 }
