@@ -23,6 +23,8 @@ import org.jboss.netty.channel.ChannelStateEvent;
 import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
+import org.jboss.netty.channel.group.ChannelGroup;
+import org.jboss.netty.channel.group.DefaultChannelGroup;
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
 import org.jboss.netty.handler.codec.protobuf.ProtobufDecoder;
 import org.jboss.netty.handler.codec.protobuf.ProtobufEncoder;
@@ -58,9 +60,12 @@ public class RiceProtoBufRpcServer extends AbstractService {
 
     private ServerBootstrap bootstrap;
 
+    private final ChannelGroup channelGroup;
+
     public RiceProtoBufRpcServer(int port, Supplier<TimeSeries> tsSupplier) {
         checkNotNull(tsSupplier);
         this.port = port;
+        this.channelGroup = new DefaultChannelGroup(this.getClass().getName());
         // Configure the server.
         this.bootstrap = new ServerBootstrap(
                 new NioServerSocketChannelFactory(
@@ -76,7 +81,7 @@ public class RiceProtoBufRpcServer extends AbstractService {
 
     public void run() {
         // Bind and start to accept incoming connections.
-        bootstrap.bind(new InetSocketAddress(port));
+        channelGroup.add(bootstrap.bind(new InetSocketAddress(port)));
     }
 
     private class RiceServerPipelineFactory implements ChannelPipelineFactory {
@@ -109,6 +114,13 @@ public class RiceProtoBufRpcServer extends AbstractService {
 
         public RiceServerHandler(Supplier<TimeSeries> tsSupplier) {
             this.tsSupplier = tsSupplier;
+        }
+
+        @Override
+        public void channelConnected(ChannelHandlerContext ctx, ChannelStateEvent e)
+                throws Exception {
+            channelGroup.add(ctx.getChannel());
+            super.channelConnected(ctx, e);
         }
 
         @Override
@@ -208,6 +220,7 @@ public class RiceProtoBufRpcServer extends AbstractService {
 
     @Override
     protected void doStop() {
+        channelGroup.close();
         bootstrap.releaseExternalResources();
         this.notifyStopped();
     }
