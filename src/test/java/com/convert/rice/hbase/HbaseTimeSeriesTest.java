@@ -191,7 +191,7 @@ public class HbaseTimeSeriesTest {
     @Test
     public void testGet_2() throws IOException {
         String key = UUID.randomUUID().toString();
-        HBaseTimeSeries ts = new HBaseTimeSeries(pool);
+        HBaseTimeSeries ts = new HBaseTimeSeries(pool, Aggregation.SECOND);
 
         HTableInterface table = pool.getTable(type);
         try {

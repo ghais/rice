@@ -13,10 +13,17 @@ import static org.joda.time.DateTimeFieldType.minuteOfHour;
 import static org.joda.time.DateTimeFieldType.monthOfYear;
 import static org.joda.time.DateTimeFieldType.secondOfMinute;
 import static org.joda.time.DateTimeFieldType.year;
+import static org.joda.time.PeriodType.hours;
+import static org.joda.time.PeriodType.minutes;
+import static org.joda.time.PeriodType.seconds;
+import static org.joda.time.chrono.ISOChronology.getInstanceUTC;
 import static org.junit.Assert.assertEquals;
+
+import java.util.Map;
 
 import org.joda.time.DateTime;
 import org.joda.time.Instant;
+import org.joda.time.Period;
 import org.junit.Test;
 
 import com.convert.rice.protocol.Aggregation;
@@ -91,5 +98,50 @@ public class AggregationUtilityTest {
         assertEquals(1L, instant.get(dayOfMonth()));
         assertEquals(original.get(monthOfYear()), instant.get(monthOfYear()));
         assertEquals(original.get(year()), instant.get(year()));
+    }
+
+    @Test
+    public void testEmptyMap_1() {
+        DateTime start = new DateTime(2012, 01, 01, 00, 00, 00, 00, getInstanceUTC());
+        DateTime end = new DateTime(2012, 01, 02, 00, 00, 00, 00, getInstanceUTC());
+
+        Map<Long, Long> result = AggregationUtility.newMap(start.getMillis(), end.getMillis(), Aggregation.SECOND);
+        assertEquals(new Period(start, end, seconds()).getSeconds(), result.size());
+    }
+
+    @Test
+    public void testEmptyMap_2() {
+        DateTime start = new DateTime(2012, 01, 01, 00, 00, 00, 00, getInstanceUTC());
+        DateTime end = new DateTime(2012, 01, 02, 00, 00, 00, 00, getInstanceUTC());
+
+        Map<Long, Long> result = AggregationUtility.newMap(start.getMillis(), end.getMillis(), Aggregation.MINUTE);
+        assertEquals(new Period(start, end, minutes()).getMinutes(), result.size());
+    }
+
+    @Test
+    public void testEmptyMap_3() {
+        DateTime start = new DateTime(2012, 01, 01, 00, 00, 00, 00, getInstanceUTC());
+        DateTime end = new DateTime(2012, 01, 02, 00, 00, 00, 00, getInstanceUTC());
+
+        Map<Long, Long> result = AggregationUtility.newMap(start.getMillis(), end.getMillis(), Aggregation.HOUR);
+        assertEquals(new Period(start, end, hours()).getHours(), result.size());
+    }
+
+    @Test
+    public void testEmptyMap_4() {
+        DateTime start = new DateTime(2012, 01, 01, 00, 00, 00, 00, getInstanceUTC());
+        DateTime end = new DateTime(2012, 01, 02, 05, 00, 00, 00, getInstanceUTC());
+
+        Map<Long, Long> result = AggregationUtility.newMap(start.getMillis(), end.getMillis(), Aggregation.DAY);
+        assertEquals(2, result.size()); // one for 2012/01/01 and one for 2012/01/02
+    }
+
+    @Test
+    public void testEmptyMap_5() {
+        DateTime start = new DateTime(2012, 01, 01, 00, 00, 00, 00, getInstanceUTC());
+        DateTime end = new DateTime(2012, 02, 02, 00, 00, 00, 00, getInstanceUTC());
+
+        Map<Long, Long> result = AggregationUtility.newMap(start.getMillis(), end.getMillis(), Aggregation.MONTH);
+        assertEquals(2, result.size()); // one for 2012/01/01 and one for 2012/02/02
     }
 }

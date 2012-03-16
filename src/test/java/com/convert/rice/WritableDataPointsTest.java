@@ -7,7 +7,6 @@
 package com.convert.rice;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
@@ -37,7 +36,7 @@ public class WritableDataPointsTest {
      */
     @Test
     public void testAggregate_1() {
-        WritableDataPoints dps = new WritableDataPoints(KEY, METRIC_NAME, new ArrayList<DataPoint>(0));
+        WritableDataPoints dps = new WritableDataPoints(KEY, METRIC_NAME, new ArrayList<DataPoint>(0), 0, 0);
         assertTrue(dps.aggregate(Aggregation.HOUR).isEmpty());
         assertTrue(dps.aggregate(Aggregation.DAY).isEmpty());
         assertTrue(dps.aggregate(Aggregation.MONTH).isEmpty());
@@ -65,21 +64,26 @@ public class WritableDataPointsTest {
             }
         };
 
-        SortedMap<Long, Long> result = new WritableDataPoints(KEY, METRIC_NAME, dps).aggregate(Aggregation.HOUR);
+        // Add 1 to the end time stamp to make the last instant inclusive
+        SortedMap<Long, Long> result = new WritableDataPoints(KEY, METRIC_NAME, dps, instant1.getMillis(),
+                instant3.getMillis() + 1).aggregate(Aggregation.HOUR);
         Iterator<Entry<Long, Long>> iterator = result.entrySet().iterator();
-        Entry<Long, Long> entry = iterator.next();
-        assertEquals(instant1.getMillis(), entry.getKey().longValue());
-        assertEquals(100, entry.getValue().longValue());
+        Instant current = instant1;
+        while (iterator.hasNext()) {
+            Entry<Long, Long> entry = iterator.next();
+            assertEquals(current.getMillis(), entry.getKey().longValue());
+            if (entry.getKey().longValue() == instant1.getMillis()) {
+                assertEquals(100, entry.getValue().longValue());
+            } else if (entry.getKey().longValue() == instant2.getMillis()) {
+                assertEquals(200, entry.getValue().longValue());
+            } else if (entry.getKey().longValue() == instant3.getMillis()) {
+                assertEquals(300, entry.getValue().longValue());
+            } else {
+                assertEquals(0L, entry.getValue().longValue());
+            }
 
-        entry = iterator.next();
-        assertEquals(instant2.getMillis(), entry.getKey().longValue());
-        assertEquals(200, entry.getValue().longValue());
-
-        entry = iterator.next();
-        assertEquals(instant3.getMillis(), entry.getKey().longValue());
-        assertEquals(300, entry.getValue().longValue());
-
-        assertFalse(iterator.hasNext());
+            current = current.plus(3600 * 1000);
+        }
     }
 
     /**
@@ -103,16 +107,24 @@ public class WritableDataPointsTest {
             }
         };
 
-        SortedMap<Long, Long> result = new WritableDataPoints(KEY, METRIC_NAME, dps).aggregate(Aggregation.DAY);
+        // Add 1 to the end time stamp to make the last instant inclusive
+        SortedMap<Long, Long> result = new WritableDataPoints(KEY, METRIC_NAME, dps, instant1.getMillis(),
+                instant3.getMillis() + 1).aggregate(Aggregation.DAY);
         Iterator<Entry<Long, Long>> iterator = result.entrySet().iterator();
-        Entry<Long, Long> entry = iterator.next();
-        assertEquals(instant1.getMillis(), entry.getKey().longValue());
-        assertEquals(300, entry.getValue().longValue());
+        Instant current = instant1;
+        while (iterator.hasNext()) {
+            Entry<Long, Long> entry = iterator.next();
+            assertEquals(current.getMillis(), entry.getKey().longValue());
+            if (entry.getKey().longValue() == instant1.getMillis()) {
+                // We aggregated instant1 and instant2
+                assertEquals(300, entry.getValue().longValue());
+            } else if (entry.getKey().longValue() == instant3.getMillis()) {
+                assertEquals(300, entry.getValue().longValue());
+            } else {
+                assertEquals(0L, entry.getValue().longValue());
+            }
 
-        entry = iterator.next();
-        assertEquals(instant3.getMillis(), entry.getKey().longValue());
-        assertEquals(300, entry.getValue().longValue());
-
-        assertFalse(iterator.hasNext());
+            current = current.plus(3600 * 1000 * 24);
+        }
     }
 }

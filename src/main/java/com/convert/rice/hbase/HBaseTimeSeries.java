@@ -1,5 +1,6 @@
 package com.convert.rice.hbase;
 
+import static com.convert.rice.AggregationUtility.aggregateTo;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Maps.newHashMap;
@@ -92,7 +93,7 @@ public class HBaseTimeSeries implements TimeSeries {
     @Override
     public Map<String, DataPoints> get(String type, String key, Interval interval) throws IOException {
         ListMultimap<String, DataPoint> dps = ArrayListMultimap.<String, DataPoint> create();
-        Instant start = interval.getStart().toInstant();
+        Instant start = aggregateTo(interval.getStart().toInstant(), aggregation);
         Instant end = interval.getEnd().toInstant();
         byte[] startRow = getRowKey(key, start);
         byte[] endRow = getRowKey(key, end);
@@ -121,7 +122,7 @@ public class HBaseTimeSeries implements TimeSeries {
         }
         Map<String, DataPoints> result = newHashMap();
         for (String metric : dps.keySet()) {
-            result.put(metric, new WritableDataPoints(key, metric, dps.get(metric)));
+            result.put(metric, new WritableDataPoints(key, metric, dps.get(metric), start.getMillis(), end.getMillis()));
         }
         return result;
     }

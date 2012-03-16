@@ -13,6 +13,20 @@ import com.convert.rice.protocol.Aggregation;
 public interface DataPoints extends Iterable<DataPoint> {
 
     /**
+     * Get the start of the interval in milli seconds
+     * 
+     * @return the start of the interval.
+     */
+    long getStart();
+
+    /**
+     * Get the end of the interval in milli seconds.
+     * 
+     * @return the end of the interval.
+     */
+    long getEnd();
+
+    /**
      * Returns the name of the series.
      * 
      * @return the metric name.
