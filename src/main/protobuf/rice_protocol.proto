@@ -39,12 +39,12 @@ message Request {
 
 	message Create {
 		required string type = 1;
-		repeated string metrics = 2;
 	}
+
 	//One of these will be filled in.
-	optional Increment inc = 1;
-	optional Get get = 2;
-	optional Create create = 3;
+	repeated Increment inc = 1;
+	repeated Get get = 2;
+	repeated Create create = 3;
 }
 
 message Response {
@@ -65,6 +65,11 @@ message Response {
 		repeated Metric metrics = 3;
 	}
 
-	optional IncResult inc_result = 1;
-	optional GetResult get_result = 2;
+	message CreateResult {
+		required string type = 1;
+	}
+
+	repeated IncResult inc_result = 1;
+	repeated GetResult get_result = 2;
+	repeated CreateResult create_result = 3;
 }

@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
@@ -44,6 +45,8 @@ public class HBaseTimeSeries implements TimeSeries {
      */
     public static final byte[] CF = new byte[] { 'v' };
 
+    private final Configuration conf;
+
     private final HTablePool pool;
 
     private final Aggregation aggregation;
@@ -53,13 +56,14 @@ public class HBaseTimeSeries implements TimeSeries {
      * 
      * @param hTable
      */
-    public HBaseTimeSeries(HTablePool pool) {
-        this(pool, Aggregation.HOUR);
+    public HBaseTimeSeries(Configuration configuration, HTablePool pool) {
+        this(configuration, pool, Aggregation.HOUR);
     }
 
-    public HBaseTimeSeries(HTablePool pool, Aggregation aggregation) {
+    public HBaseTimeSeries(Configuration conf, HTablePool pool, Aggregation aggregation) {
         this.aggregation = checkNotNull(aggregation);
         this.pool = checkNotNull(pool);
+        this.conf = checkNotNull(conf);
     }
 
     @Override
@@ -146,6 +150,14 @@ public class HBaseTimeSeries implements TimeSeries {
         rowKey[key.length()] = ':';
         System.arraycopy(Bytes.toBytes(instant.getMillis()), 0, rowKey, key.length() + 1, 8);
         return rowKey;
+    }
+
+    @Override
+    public void create(String type) throws IOException {
+        HBaseAdmin admin = new HBaseAdmin(this.conf);
+        HTableDescriptor descriptor = new HTableDescriptor(Bytes.toBytes(type));
+        descriptor.addFamily(new HColumnDescriptor(CF));
+        admin.createTable(descriptor);
     }
 
     public boolean checkOrCreateTable(HBaseAdmin admin, String type) throws IOException {

@@ -17,7 +17,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableExistsException;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTableInterface;
@@ -52,6 +56,8 @@ public class HbaseTimeSeriesTest {
 
     private static HBaseTestingUtility testUtil;
 
+    private static Configuration configuration;
+
     private static HTablePool pool;
 
     private static final String type = "type";
@@ -62,16 +68,17 @@ public class HbaseTimeSeriesTest {
     public static void setup() throws Exception {
         testUtil = new HBaseTestingUtility();
         testUtil.startMiniCluster();
-        pool = new HTablePool(testUtil.getConfiguration(), 10);
+        configuration = testUtil.getConfiguration();
+        pool = new HTablePool(configuration, 10);
         admin = testUtil.getHBaseAdmin();
 
-        new HBaseTimeSeries(pool).checkOrCreateTable(admin, type);
+        new HBaseTimeSeries(configuration, pool).checkOrCreateTable(admin, type);
 
     }
 
     @AfterClass
     public static void after() throws IOException {
-        new HBaseTimeSeries(pool).deleteTable(admin, type);
+        new HBaseTimeSeries(configuration, pool).deleteTable(admin, type);
         pool.close();
         testUtil.shutdownMiniCluster();
     }
@@ -90,7 +97,7 @@ public class HbaseTimeSeriesTest {
                 put("b", 2L);
             }
         };
-        HBaseTimeSeries ts = new HBaseTimeSeries(pool, Aggregation.MINUTE);
+        HBaseTimeSeries ts = new HBaseTimeSeries(configuration, pool, Aggregation.MINUTE);
         ts.inc(type, key, instant.getMillis(), dps);
 
         HTableInterface table = pool.getTable(type);
@@ -117,7 +124,7 @@ public class HbaseTimeSeriesTest {
                 put("b", 2L);
             }
         };
-        HBaseTimeSeries ts = new HBaseTimeSeries(pool, Aggregation.SECOND);
+        HBaseTimeSeries ts = new HBaseTimeSeries(configuration, pool, Aggregation.SECOND);
         for (int i = 1000; i <= 100000; i += 1000) {
             ts.inc(type, key, i, dps);
         }
@@ -154,7 +161,7 @@ public class HbaseTimeSeriesTest {
                 put("b", 2L);
             }
         };
-        HBaseTimeSeries ts = new HBaseTimeSeries(pool, Aggregation.SECOND);
+        HBaseTimeSeries ts = new HBaseTimeSeries(configuration, pool, Aggregation.SECOND);
         for (int i = 1000; i <= 100000; i += 1000) {
             ts.inc(type, key, i, dps);
             ts.inc(type, key, i, dps);
@@ -183,7 +190,7 @@ public class HbaseTimeSeriesTest {
     @Test
     public void testGet_1() throws IOException {
         String key = UUID.randomUUID().toString();
-        HBaseTimeSeries ts = new HBaseTimeSeries(pool);
+        HBaseTimeSeries ts = new HBaseTimeSeries(configuration, pool);
         Map<String, DataPoints> result = ts.get(type, key, new Interval(0, System.currentTimeMillis()));
         assertTrue(result.isEmpty());
     }
@@ -191,7 +198,7 @@ public class HbaseTimeSeriesTest {
     @Test
     public void testGet_2() throws IOException {
         String key = UUID.randomUUID().toString();
-        HBaseTimeSeries ts = new HBaseTimeSeries(pool, Aggregation.SECOND);
+        HBaseTimeSeries ts = new HBaseTimeSeries(configuration, pool, Aggregation.SECOND);
 
         HTableInterface table = pool.getTable(type);
         try {
@@ -223,6 +230,23 @@ public class HbaseTimeSeriesTest {
             assertEquals((i + 1) * 1000, dp.getTimestamp());
             assertEquals(2, dp.getValue());
         }
+    }
 
+    @Test
+    public void testCreate() throws IOException {
+        new HBaseTimeSeries(configuration, pool).create("u");
+
+        HTableDescriptor tableDescriptor = admin.getTableDescriptor(new byte[] { 'u' });
+        assertEquals(1, tableDescriptor.getFamiliesKeys().size());
+        assertTrue(tableDescriptor.getFamiliesKeys().contains(CF));
+    }
+
+    @Test(expected = TableExistsException.class)
+    public void testCreate_table_exists() throws IOException {
+        HTableDescriptor descriptor = new HTableDescriptor(new byte[] { 'u' });
+        descriptor.addFamily(new HColumnDescriptor(new byte[] { 'x' }));
+        admin.createTable(descriptor);
+
+        new HBaseTimeSeries(configuration, pool).create("u");
     }
 }

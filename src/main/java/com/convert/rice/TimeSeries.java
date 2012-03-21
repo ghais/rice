@@ -10,4 +10,7 @@ public interface TimeSeries {
     Map<String, DataPoints> get(String type, String key, Interval interval) throws IOException;
 
     void inc(String type, String key, long timestamp, Map<String, Long> dps) throws IOException;
+
+    void create(String type) throws IOException;
+
 }

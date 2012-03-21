@@ -36,10 +36,12 @@ import com.convert.rice.DataPoints;
 import com.convert.rice.TimeSeries;
 import com.convert.rice.protocol.Point;
 import com.convert.rice.protocol.Request;
+import com.convert.rice.protocol.Request.Create;
 import com.convert.rice.protocol.Request.Get;
 import com.convert.rice.protocol.Request.Increment;
 import com.convert.rice.protocol.Request.Increment.Metric;
 import com.convert.rice.protocol.Response;
+import com.convert.rice.protocol.Response.CreateResult;
 import com.convert.rice.protocol.Response.GetResult;
 import com.convert.rice.protocol.Response.IncResult;
 import com.google.common.base.Supplier;
@@ -54,6 +56,9 @@ public class RiceProtoBufRpcServer extends AbstractService {
             TimeUnit.SECONDS);
 
     private final Timer gets = Metrics.newTimer(RiceProtoBufRpcServer.class, "gets", TimeUnit.MILLISECONDS,
+            TimeUnit.SECONDS);
+
+    private final Timer creates = Metrics.newTimer(RiceProtoBufRpcServer.class, "creates", TimeUnit.MILLISECONDS,
             TimeUnit.SECONDS);
 
     private final int port;
@@ -137,11 +142,10 @@ public class RiceProtoBufRpcServer extends AbstractService {
                 ChannelHandlerContext ctx, MessageEvent e) throws Exception {
             Request req = (Request) e.getMessage();
             TimeSeries timeSeries = tsSupplier.get();
-            if (req.hasInc()) {
+            for (Increment inc : req.getIncList()) {
                 IncResult.Builder builder = IncResult.newBuilder();
                 final TimerContext timer = increments.time();
                 try {
-                    Increment inc = req.getInc();
                     long timestamp = inc.hasTimestamp() ? inc.getTimestamp() : System.currentTimeMillis();
                     Map<String, Long> metrics = new HashMap<String, Long>(inc.getMetricsCount());
                     for (Metric metric : inc.getMetricsList()) {
@@ -150,7 +154,7 @@ public class RiceProtoBufRpcServer extends AbstractService {
                     timeSeries.inc(inc.getType(), inc.getKey(), timestamp, metrics);
                     builder.setKey(inc.getKey()).setType(inc.getType()).setTimestamp(inc.getTimestamp()).build();
                 } finally {
-                    e.getChannel().write(Response.newBuilder().setIncResult(builder))
+                    e.getChannel().write(Response.newBuilder().addIncResult(builder))
                             .addListener(new ChannelFutureListener() {
 
                                 @Override
@@ -160,11 +164,11 @@ public class RiceProtoBufRpcServer extends AbstractService {
                             });
 
                 }
-            } else if (req.hasGet()) {
+            }
+            for (Get get : req.getGetList()) {
                 final TimerContext timer = gets.time();
                 GetResult.Builder builder = GetResult.newBuilder();
                 try {
-                    Get get = req.getGet();
                     builder.setKey(get.getKey());
                     builder.setType(get.getType());
 
@@ -181,7 +185,7 @@ public class RiceProtoBufRpcServer extends AbstractService {
                     }
 
                 } finally {
-                    e.getChannel().write(Response.newBuilder().setGetResult(builder))
+                    e.getChannel().write(Response.newBuilder().addGetResult(builder))
                             .addListener(new ChannelFutureListener() {
 
                                 @Override
@@ -191,8 +195,25 @@ public class RiceProtoBufRpcServer extends AbstractService {
                             });
 
                 }
-            } else {
-                logger.severe("Unknown message type");
+            }
+
+            for (Create create : req.getCreateList()) {
+                final TimerContext timer = creates.time();
+                CreateResult.Builder builder = CreateResult.newBuilder();
+                try {
+                    builder.setType(create.getType());
+                    timeSeries.create(create.getType());
+                } finally {
+                    e.getChannel().write(Response.newBuilder().addCreateResult(builder))
+                            .addListener(new ChannelFutureListener() {
+
+                                @Override
+                                public void operationComplete(ChannelFuture future) throws Exception {
+                                    timer.stop();
+                                }
+                            });
+
+                }
             }
         }
 

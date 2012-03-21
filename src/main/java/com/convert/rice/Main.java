@@ -1,5 +1,6 @@
 package com.convert.rice;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.Arrays.asList;
 
 import java.io.IOException;
@@ -33,7 +34,7 @@ public class Main {
         Configuration conf = new Configuration();
         conf.set(HConstants.ZOOKEEPER_QUORUM, (String) options.valueOf("zkquorum"));
         HTablePool pool = new HTablePool(conf, Integer.MAX_VALUE);
-        Supplier<TimeSeries> supplier = new HBaseTimeSeriesSupplier(pool);
+        Supplier<TimeSeries> supplier = new HBaseTimeSeriesSupplier(conf, pool);
         if (options.has("h")) {
             parser.printHelpOn(System.out);
             System.exit(0);
@@ -45,15 +46,18 @@ public class Main {
 
     private static class HBaseTimeSeriesSupplier implements Supplier<TimeSeries> {
 
-        private HTablePool pool;
+        private final Configuration conf;
 
-        public HBaseTimeSeriesSupplier(HTablePool pool) {
-            this.pool = pool;
+        private final HTablePool pool;
+
+        public HBaseTimeSeriesSupplier(Configuration conf, HTablePool pool) {
+            this.conf = checkNotNull(conf);
+            this.pool = checkNotNull(pool);
         }
 
         @Override
         public TimeSeries get() {
-            return new HBaseTimeSeries(pool);
+            return new HBaseTimeSeries(conf, pool);
         }
     }
 
