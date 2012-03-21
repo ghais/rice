@@ -3,6 +3,7 @@ package com.convert.rice.server.protobuf;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.jboss.netty.channel.Channels.pipeline;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
@@ -12,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.hadoop.hbase.TableNotFoundException;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.ChannelEvent;
 import org.jboss.netty.channel.ChannelFuture;
@@ -42,6 +44,9 @@ import com.convert.rice.protocol.Request.Increment;
 import com.convert.rice.protocol.Request.Increment.Metric;
 import com.convert.rice.protocol.Response;
 import com.convert.rice.protocol.Response.CreateResult;
+import com.convert.rice.protocol.Response.Error;
+import com.convert.rice.protocol.Response.Error.Builder;
+import com.convert.rice.protocol.Response.Error.Status;
 import com.convert.rice.protocol.Response.GetResult;
 import com.convert.rice.protocol.Response.IncResult;
 import com.google.common.base.Supplier;
@@ -139,8 +144,8 @@ public class RiceProtoBufRpcServer extends AbstractService {
 
         @Override
         public void messageReceived(
-                ChannelHandlerContext ctx, MessageEvent e) throws Exception {
-            Request req = (Request) e.getMessage();
+                ChannelHandlerContext ctx, MessageEvent event) throws Exception {
+            Request req = (Request) event.getMessage();
             TimeSeries timeSeries = tsSupplier.get();
             for (Increment inc : req.getIncList()) {
                 IncResult.Builder builder = IncResult.newBuilder();
@@ -151,10 +156,18 @@ public class RiceProtoBufRpcServer extends AbstractService {
                     for (Metric metric : inc.getMetricsList()) {
                         metrics.put(metric.getKey(), metric.getValue());
                     }
-                    timeSeries.inc(inc.getType(), inc.getKey(), timestamp, metrics);
                     builder.setKey(inc.getKey()).setType(inc.getType()).setTimestamp(inc.getTimestamp()).build();
+                    try {
+                        timeSeries.inc(inc.getType(), inc.getKey(), timestamp, metrics);
+                    } catch (IOException e) {
+                        Builder errorBuilder = Error.newBuilder()
+                                .setMessage(e.getMessage())
+                                .setStatus(Status.IO_EXCEPTION);
+                        builder.setError(errorBuilder);
+                        logger.log(Level.SEVERE, e.getMessage(), e);
+                    }
                 } finally {
-                    e.getChannel().write(Response.newBuilder().addIncResult(builder))
+                    event.getChannel().write(Response.newBuilder().addIncResult(builder))
                             .addListener(new ChannelFutureListener() {
 
                                 @Override
@@ -171,21 +184,28 @@ public class RiceProtoBufRpcServer extends AbstractService {
                 try {
                     builder.setKey(get.getKey());
                     builder.setType(get.getType());
-
-                    Map<String, DataPoints> dataPoints = timeSeries.get(get.getType(), get.getKey(),
-                            new Interval(get.getStart(), get.getEnd()));
-                    for (DataPoints dps : dataPoints.values()) {
-                        GetResult.Metric.Builder metricBuilder = GetResult.Metric.newBuilder().setName(
-                                dps.getMetricName());
-                        for (Entry<Long, Long> dp : dps.aggregate(get.getAggregation()).entrySet()) {
-                            metricBuilder.addPoints(Point.newBuilder().setTimestamp(dp.getKey())
-                                    .setValue(dp.getValue()));
+                    try {
+                        Map<String, DataPoints> dataPoints = timeSeries.get(get.getType(), get.getKey(),
+                                new Interval(get.getStart(), get.getEnd()));
+                        for (DataPoints dps : dataPoints.values()) {
+                            GetResult.Metric.Builder metricBuilder = GetResult.Metric.newBuilder().setName(
+                                    dps.getMetricName());
+                            for (Entry<Long, Long> dp : dps.aggregate(get.getAggregation()).entrySet()) {
+                                metricBuilder.addPoints(Point.newBuilder().setTimestamp(dp.getKey())
+                                        .setValue(dp.getValue()));
+                            }
+                            builder.addMetrics(metricBuilder);
                         }
-                        builder.addMetrics(metricBuilder);
+                    } catch (IOException e) {
+                        Builder errorBuilder = Error.newBuilder()
+                                .setMessage(e.getMessage())
+                                .setStatus(Status.IO_EXCEPTION);
+                        builder.setError(errorBuilder);
+                        logger.log(Level.SEVERE, e.getMessage(), e);
                     }
 
                 } finally {
-                    e.getChannel().write(Response.newBuilder().addGetResult(builder))
+                    event.getChannel().write(Response.newBuilder().addGetResult(builder))
                             .addListener(new ChannelFutureListener() {
 
                                 @Override
@@ -203,8 +223,20 @@ public class RiceProtoBufRpcServer extends AbstractService {
                 try {
                     builder.setType(create.getType());
                     timeSeries.create(create.getType());
+                } catch (TableNotFoundException e) {
+                    Builder errorBuilder = Error.newBuilder()
+                            .setMessage(e.getMessage())
+                            .setStatus(Status.TABLE_NOT_FOUND);
+                    builder.setError(errorBuilder);
+                    logger.log(Level.SEVERE, e.getMessage(), e);
+                } catch (IOException e) {
+                    Builder errorBuilder = Error.newBuilder()
+                            .setMessage(e.getMessage())
+                            .setStatus(Status.IO_EXCEPTION);
+                    builder.setError(errorBuilder);
+                    logger.log(Level.SEVERE, e.getMessage(), e);
                 } finally {
-                    e.getChannel().write(Response.newBuilder().addCreateResult(builder))
+                    event.getChannel().write(Response.newBuilder().addCreateResult(builder))
                             .addListener(new ChannelFutureListener() {
 
                                 @Override

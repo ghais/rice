@@ -48,10 +48,20 @@ message Request {
 }
 
 message Response {
+	message Error {
+		enum Status {
+			TABLE_NOT_FOUND = 1;
+			IO_EXCEPTION = 2;
+		}
+		optional string message = 1;
+		optional Status status = 2;
+	}
 	message IncResult {
 		required string type = 1;
 		required string key = 2;
 		required int64 timestamp = 3;
+
+		optional Error error = 100;
 	}
 
 	message GetResult {
@@ -63,13 +73,19 @@ message Response {
 		required string type = 1;
 		required string key = 2;
 		repeated Metric metrics = 3;
+
+		optional Error error = 100;
+
 	}
 
 	message CreateResult {
 		required string type = 1;
+
+		optional Error error = 100;
 	}
 
 	repeated IncResult inc_result = 1;
 	repeated GetResult get_result = 2;
 	repeated CreateResult create_result = 3;
+
 }
