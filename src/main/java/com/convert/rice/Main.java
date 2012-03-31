@@ -15,6 +15,7 @@ import org.apache.hadoop.hbase.client.HTablePool;
 import com.convert.rice.hbase.HBaseTimeSeries;
 import com.convert.rice.server.protobuf.RiceProtoBufRpcServer;
 import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 
 public class Main {
 
@@ -34,7 +35,7 @@ public class Main {
         Configuration conf = new Configuration();
         conf.set(HConstants.ZOOKEEPER_QUORUM, (String) options.valueOf("zkquorum"));
         HTablePool pool = new HTablePool(conf, Integer.MAX_VALUE);
-        Supplier<TimeSeries> supplier = new HBaseTimeSeriesSupplier(conf, pool);
+        Supplier<TimeSeries> supplier = Suppliers.memoize(new HBaseTimeSeriesSupplier(conf, pool));
         if (options.has("h")) {
             parser.printHelpOn(System.out);
             System.exit(0);
