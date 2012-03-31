@@ -52,6 +52,7 @@ import com.convert.rice.protocol.Response.IncResult;
 import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.AbstractService;
 import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.Timer;
 import com.yammer.metrics.core.TimerContext;
 
@@ -87,6 +88,13 @@ public class RiceProtoBufRpcServer extends AbstractService {
         bootstrap.setOption("child.tcpNoDelay", true);
         bootstrap.setOption("child.keepAlive", true);
         bootstrap.setOption("reuseAddress", true);
+        
+        Metrics.newGauge(RiceProtoBufRpcServer.class, "open-channels", new Gauge<Integer>() {
+            @Override
+            public Integer value() {
+                return channelGroup.size();
+            }
+        });
     }
 
     public void run() {
@@ -256,9 +264,15 @@ public class RiceProtoBufRpcServer extends AbstractService {
                     Level.WARNING,
                     "Unexpected exception from downstream.",
                     e.getCause());
+            channelGroup.remove(e.getChannel());
             e.getChannel().close();
         }
 
+        @Override
+        public void channelClosed(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception {
+            channelGroup.remove(e.getChannel());
+            super.channelClosed(ctx, e);
+        }
     }
 
     @Override
