@@ -51,6 +51,8 @@ public class HBaseTimeSeries implements TimeSeries {
 
     private final Aggregation aggregation;
 
+    private final boolean writeToWall;
+
     /**
      * The HTable associated with the metric type.
      * 
@@ -61,9 +63,14 @@ public class HBaseTimeSeries implements TimeSeries {
     }
 
     public HBaseTimeSeries(Configuration conf, HTablePool pool, Aggregation aggregation) {
+        this(conf, pool, false, aggregation);
+    }
+
+    public HBaseTimeSeries(Configuration conf, HTablePool pool, boolean writeToWAL, Aggregation aggregation) {
         this.aggregation = checkNotNull(aggregation);
         this.pool = checkNotNull(pool);
         this.conf = checkNotNull(conf);
+        this.writeToWall = writeToWAL;
     }
 
     @Override
@@ -76,6 +83,7 @@ public class HBaseTimeSeries implements TimeSeries {
         byte[] entryKey = getRowKey(key, timeStamp);
 
         Increment inc = new Increment(entryKey);
+        inc.setWriteToWAL(this.writeToWall);
         for (Entry<String, Long> entry : dps.entrySet()) {
             inc.addColumn(CF, Bytes.toBytes(entry.getKey()), entry.getValue());
         }
