@@ -2,6 +2,7 @@ package com.convert.rice;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.Arrays.asList;
+import static org.apache.commons.lang.StringUtils.equalsIgnoreCase;
 
 import java.io.IOException;
 
@@ -38,6 +39,11 @@ public class Main {
                         .describedAs("Whether to write increments to the WAL first (true or false)")
                         .ofType(Boolean.class)
                         .defaultsTo(true);
+                accepts("minInterval")
+                        .withRequiredArg()
+                        .describedAs("the minimum interval to store (s for second, m for minute,h for hour")
+                        .ofType(String.class)
+                        .defaultsTo("m");
 
                 acceptsAll(asList("help", "h", "?"), "show help");
             }
@@ -54,7 +60,10 @@ public class Main {
         conf.set(HConstants.ZOOKEEPER_QUORUM, (String) options.valueOf("zkquorum"));
         HTablePool pool = new HTablePool(conf, Integer.MAX_VALUE);
         Boolean writeToWAL = (Boolean) options.valueOf("hbase.writeToWAL");
-        Aggregation precision = Aggregation.HOUR;
+
+        Aggregation precision = equalsIgnoreCase("s", (String) options.valueOf("minInterval")) ? Aggregation.SECOND :
+                equalsIgnoreCase((String) options.valueOf("minInterval"), "m") ? Aggregation.MINUTE :
+                        Aggregation.HOUR;
         HBaseTimeSeriesSupplier hbaseTimeSeriesSupplier = new HBaseTimeSeriesSupplier(conf, pool, writeToWAL, precision);
         Supplier<TimeSeries> supplier = Suppliers.memoize(hbaseTimeSeriesSupplier);
 
