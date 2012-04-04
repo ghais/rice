@@ -58,6 +58,9 @@ import com.yammer.metrics.core.TimerContext;
 
 public class RiceProtoBufRpcServer extends AbstractService {
 
+    private final Timer requests = Metrics.newTimer(RiceProtoBufRpcServer.class, "requests", TimeUnit.MILLISECONDS,
+            TimeUnit.SECONDS);
+
     private final Timer increments = Metrics.newTimer(RiceProtoBufRpcServer.class, "increments", TimeUnit.MILLISECONDS,
             TimeUnit.SECONDS);
 
@@ -88,8 +91,9 @@ public class RiceProtoBufRpcServer extends AbstractService {
         bootstrap.setOption("child.tcpNoDelay", true);
         bootstrap.setOption("child.keepAlive", true);
         bootstrap.setOption("reuseAddress", true);
-        
+
         Metrics.newGauge(RiceProtoBufRpcServer.class, "open-channels", new Gauge<Integer>() {
+
             @Override
             public Integer value() {
                 return channelGroup.size();
@@ -153,107 +157,98 @@ public class RiceProtoBufRpcServer extends AbstractService {
         @Override
         public void messageReceived(
                 ChannelHandlerContext ctx, MessageEvent event) throws Exception {
+            final TimerContext requestTimer = requests.time();
             Request req = (Request) event.getMessage();
             TimeSeries timeSeries = tsSupplier.get();
-            for (Increment inc : req.getIncList()) {
-                IncResult.Builder builder = IncResult.newBuilder();
-                final TimerContext timer = increments.time();
-                try {
-                    long timestamp = inc.hasTimestamp() ? inc.getTimestamp() : System.currentTimeMillis();
-                    Map<String, Long> metrics = new HashMap<String, Long>(inc.getMetricsCount());
-                    for (Metric metric : inc.getMetricsList()) {
-                        metrics.put(metric.getKey(), metric.getValue());
-                    }
-                    builder.setKey(inc.getKey()).setType(inc.getType()).setTimestamp(inc.getTimestamp()).build();
+            Response.Builder responseBuilder = Response.newBuilder();
+            try {
+                for (Increment inc : req.getIncList()) {
+                    IncResult.Builder builder = IncResult.newBuilder();
+                    final TimerContext timer = increments.time();
                     try {
-                        timeSeries.inc(inc.getType(), inc.getKey(), timestamp, metrics);
-                    } catch (IOException e) {
-                        Builder errorBuilder = Error.newBuilder()
-                                .setMessage(e.getMessage())
-                                .setStatus(Status.IO_EXCEPTION);
-                        builder.setError(errorBuilder);
-                        logger.log(Level.SEVERE, e.getMessage(), e);
-                    }
-                } finally {
-                    event.getChannel().write(Response.newBuilder().addIncResult(builder))
-                            .addListener(new ChannelFutureListener() {
-
-                                @Override
-                                public void operationComplete(ChannelFuture future) throws Exception {
-                                    timer.stop();
-                                }
-                            });
-
-                }
-            }
-            for (Get get : req.getGetList()) {
-                final TimerContext timer = gets.time();
-                GetResult.Builder builder = GetResult.newBuilder();
-                try {
-                    builder.setKey(get.getKey());
-                    builder.setType(get.getType());
-                    try {
-                        Map<String, DataPoints> dataPoints = timeSeries.get(get.getType(), get.getKey(),
-                                new Interval(get.getStart(), get.getEnd()));
-                        for (DataPoints dps : dataPoints.values()) {
-                            GetResult.Metric.Builder metricBuilder = GetResult.Metric.newBuilder().setName(
-                                    dps.getMetricName());
-                            for (Entry<Long, Long> dp : dps.aggregate(get.getAggregation()).entrySet()) {
-                                metricBuilder.addPoints(Point.newBuilder().setTimestamp(dp.getKey())
-                                        .setValue(dp.getValue()));
-                            }
-                            builder.addMetrics(metricBuilder);
+                        long timestamp = inc.hasTimestamp() ? inc.getTimestamp() : System.currentTimeMillis();
+                        Map<String, Long> metrics = new HashMap<String, Long>(inc.getMetricsCount());
+                        for (Metric metric : inc.getMetricsList()) {
+                            metrics.put(metric.getKey(), metric.getValue());
                         }
+                        builder.setKey(inc.getKey()).setType(inc.getType()).setTimestamp(inc.getTimestamp()).build();
+                        try {
+                            timeSeries.inc(inc.getType(), inc.getKey(), timestamp, metrics);
+                        } catch (IOException e) {
+                            Builder errorBuilder = Error.newBuilder()
+                                    .setMessage(e.getMessage())
+                                    .setStatus(Status.IO_EXCEPTION);
+                            builder.setError(errorBuilder);
+                            logger.log(Level.SEVERE, e.getMessage(), e);
+                        }
+                    } finally {
+                        responseBuilder.addIncResult(builder);
+                        timer.stop();
+                    }
+                }
+                for (Get get : req.getGetList()) {
+                    final TimerContext timer = gets.time();
+                    GetResult.Builder builder = GetResult.newBuilder();
+                    try {
+                        builder.setKey(get.getKey());
+                        builder.setType(get.getType());
+                        try {
+                            Map<String, DataPoints> dataPoints = timeSeries.get(get.getType(), get.getKey(),
+                                    new Interval(get.getStart(), get.getEnd()));
+                            for (DataPoints dps : dataPoints.values()) {
+                                GetResult.Metric.Builder metricBuilder = GetResult.Metric.newBuilder().setName(
+                                        dps.getMetricName());
+                                for (Entry<Long, Long> dp : dps.aggregate(get.getAggregation()).entrySet()) {
+                                    metricBuilder.addPoints(Point.newBuilder().setTimestamp(dp.getKey())
+                                            .setValue(dp.getValue()));
+                                }
+                                builder.addMetrics(metricBuilder);
+                            }
+                        } catch (IOException e) {
+                            Builder errorBuilder = Error.newBuilder()
+                                    .setMessage(e.getMessage())
+                                    .setStatus(Status.IO_EXCEPTION);
+                            builder.setError(errorBuilder);
+                            logger.log(Level.SEVERE, e.getMessage(), e);
+                        }
+
+                    } finally {
+                        responseBuilder.addGetResult(builder);
+                        timer.stop();
+                    }
+                }
+
+                for (Create create : req.getCreateList()) {
+                    final TimerContext timer = creates.time();
+                    CreateResult.Builder builder = CreateResult.newBuilder();
+                    try {
+                        builder.setType(create.getType());
+                        timeSeries.create(create.getType());
+                    } catch (TableNotFoundException e) {
+                        Builder errorBuilder = Error.newBuilder()
+                                .setMessage(e.getMessage())
+                                .setStatus(Status.TABLE_NOT_FOUND);
+                        builder.setError(errorBuilder);
+                        logger.log(Level.SEVERE, e.getMessage(), e);
                     } catch (IOException e) {
                         Builder errorBuilder = Error.newBuilder()
                                 .setMessage(e.getMessage())
                                 .setStatus(Status.IO_EXCEPTION);
                         builder.setError(errorBuilder);
                         logger.log(Level.SEVERE, e.getMessage(), e);
+                    } finally {
+                        responseBuilder.addCreateResult(builder);
+                        timer.stop();
                     }
-
-                } finally {
-                    event.getChannel().write(Response.newBuilder().addGetResult(builder))
-                            .addListener(new ChannelFutureListener() {
-
-                                @Override
-                                public void operationComplete(ChannelFuture future) throws Exception {
-                                    timer.stop();
-                                }
-                            });
-
                 }
-            }
+            } finally {
+                event.getChannel().write(responseBuilder).addListener(new ChannelFutureListener() {
 
-            for (Create create : req.getCreateList()) {
-                final TimerContext timer = creates.time();
-                CreateResult.Builder builder = CreateResult.newBuilder();
-                try {
-                    builder.setType(create.getType());
-                    timeSeries.create(create.getType());
-                } catch (TableNotFoundException e) {
-                    Builder errorBuilder = Error.newBuilder()
-                            .setMessage(e.getMessage())
-                            .setStatus(Status.TABLE_NOT_FOUND);
-                    builder.setError(errorBuilder);
-                    logger.log(Level.SEVERE, e.getMessage(), e);
-                } catch (IOException e) {
-                    Builder errorBuilder = Error.newBuilder()
-                            .setMessage(e.getMessage())
-                            .setStatus(Status.IO_EXCEPTION);
-                    builder.setError(errorBuilder);
-                    logger.log(Level.SEVERE, e.getMessage(), e);
-                } finally {
-                    event.getChannel().write(Response.newBuilder().addCreateResult(builder))
-                            .addListener(new ChannelFutureListener() {
-
-                                @Override
-                                public void operationComplete(ChannelFuture future) throws Exception {
-                                    timer.stop();
-                                }
-                            });
-
-                }
+                    @Override
+                    public void operationComplete(ChannelFuture future) throws Exception {
+                        requestTimer.stop();
+                    }
+                });
             }
         }
 
