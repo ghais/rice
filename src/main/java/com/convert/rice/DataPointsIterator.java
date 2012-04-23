@@ -1,7 +1,5 @@
 package com.convert.rice;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 import java.util.NoSuchElementException;
 
 public class DataPointsIterator implements SeekableView {
@@ -37,7 +35,6 @@ public class DataPointsIterator implements SeekableView {
 
     @Override
     public void seek(long timestamp) {
-        checkArgument(timestamp >= 0, "Negative timestamp");
         // Do a binary search to find the timestamp given or the one right before.
         short lo = 0;
         short hi = (short) dataPoints.size();
@@ -95,6 +92,14 @@ public class DataPointsIterator implements SeekableView {
     public long value() {
         if (hasNext()) {
             return dataPoints.get(index).getValue();
+        }
+        throw new NoSuchElementException("no more elements in " + this);
+    }
+
+    @Override
+    public DataPoint peek() {
+        if (hasNext()) {
+            return dataPoints.get(index);
         }
         throw new NoSuchElementException("no more elements in " + this);
     }

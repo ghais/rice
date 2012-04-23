@@ -1,9 +1,3 @@
-/**
- * (C) 2011 Digi-Net Technologies, Inc.
- * 4420 Northwest 36th Avenue
- * Gainesville, FL 32606 USA
- * All rights reserved.
- */
 package com.convert.rice.hbase;
 
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
@@ -34,22 +28,16 @@ import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.filter.RowFilter;
 import org.apache.hadoop.hbase.filter.WhileMatchFilter;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.joda.time.Instant;
 import org.joda.time.Interval;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.convert.rice.AggregationUtility;
 import com.convert.rice.DataPoint;
 import com.convert.rice.DataPoints;
-import com.convert.rice.protocol.Aggregation;
+import com.convert.rice.RowInterval;
 import com.google.common.collect.Lists;
 
-/**
- * @author Ghais Issa <ghais.issa@convertglobal.com>
- * 
- */
 public class HbaseTimeSeriesTest {
 
     private static final byte[] CF = HBaseTimeSeries.CF;
@@ -86,8 +74,8 @@ public class HbaseTimeSeriesTest {
     @Test
     public void testInc_1() throws IOException {
         String key = UUID.randomUUID().toString();
-        Instant instant = new Instant();
-        Instant aggregatedInstant = AggregationUtility.aggregateTo(instant, Aggregation.MINUTE);
+        long instant = System.currentTimeMillis();
+        long aggregatedInstant = RowInterval.MINUTE.getStart(instant);
         Map<String, Long> dps = new HashMap<String, Long>() {
 
             private static final long serialVersionUID = -8468159673993092578L;
@@ -97,14 +85,14 @@ public class HbaseTimeSeriesTest {
                 put("b", 2L);
             }
         };
-        HBaseTimeSeries ts = new HBaseTimeSeries(configuration, pool, Aggregation.MINUTE);
-        ts.inc(type, key, instant.getMillis(), dps);
+        HBaseTimeSeries ts = new HBaseTimeSeries(configuration, pool, RowInterval.MINUTE);
+        ts.inc(type, key, instant, dps);
 
         HTableInterface table = pool.getTable(type);
         try {
             Get get = new Get(ts.getRowKey(key, aggregatedInstant));
             Result r = table.get(get);
-            assertEquals(aggregatedInstant, ts.getInstant(r.getRow(), key));
+            assertEquals(aggregatedInstant, ts.getStart(r.getRow(), key));
             assertEquals(1L, toLong(r.getValue(CF, toBytes("a"))));
             assertEquals(2L, toLong(r.getValue(CF, toBytes("b"))));
         } finally {
@@ -124,25 +112,25 @@ public class HbaseTimeSeriesTest {
                 put("b", 2L);
             }
         };
-        HBaseTimeSeries ts = new HBaseTimeSeries(configuration, pool, Aggregation.SECOND);
+        HBaseTimeSeries ts = new HBaseTimeSeries(configuration, pool, RowInterval.SECOND);
         for (int i = 1000; i <= 100000; i += 1000) {
             ts.inc(type, key, i, dps);
         }
 
         HTableInterface table = pool.getTable(type);
         try {
-            Scan scan = new Scan(ts.getRowKey(key, new Instant(0)));
+            Scan scan = new Scan(ts.getRowKey(key, 0L));
             scan.setFilter(new WhileMatchFilter(
                     new RowFilter(CompareOp.EQUAL, new BinaryPrefixComparator(toBytes(key)))));
             ArrayList<Result> results = Lists.newArrayList(table.getScanner(scan).iterator());
             for (int i = 1; i <= 100; i++) {
                 Result r = results.get(i - 1);
-                assertEquals(new Instant(i * 1000L), ts.getInstant(r.getRow(), key));
+                assertEquals(i * 1000L, ts.getStart(r.getRow(), key));
                 assertEquals(1L, toLong(r.getValue(CF, toBytes("a"))));
                 assertEquals(2L, toLong(r.getValue(CF, toBytes("b"))));
             }
             for (Result r : table.getScanner(scan)) {
-                ts.getInstant(r.getRow(), key);
+                ts.getStart(r.getRow(), key);
             }
         } finally {
             pool.putTable(table);
@@ -161,7 +149,7 @@ public class HbaseTimeSeriesTest {
                 put("b", 2L);
             }
         };
-        HBaseTimeSeries ts = new HBaseTimeSeries(configuration, pool, Aggregation.SECOND);
+        HBaseTimeSeries ts = new HBaseTimeSeries(configuration, pool, RowInterval.SECOND);
         for (int i = 1000; i <= 100000; i += 1000) {
             ts.inc(type, key, i, dps);
             ts.inc(type, key, i, dps);
@@ -169,18 +157,18 @@ public class HbaseTimeSeriesTest {
 
         HTableInterface table = pool.getTable(type);
         try {
-            Scan scan = new Scan(ts.getRowKey(key, new Instant(0)));
+            Scan scan = new Scan(ts.getRowKey(key, 0L));
             scan.setFilter(new WhileMatchFilter(
                     new RowFilter(CompareOp.EQUAL, new BinaryPrefixComparator(toBytes(key)))));
             ArrayList<Result> results = Lists.newArrayList(table.getScanner(scan).iterator());
             for (int i = 1; i <= 100; i++) {
                 Result r = results.get(i - 1);
-                assertEquals(new Instant(i * 1000L), ts.getInstant(r.getRow(), key));
+                assertEquals(i * 1000L, ts.getStart(r.getRow(), key));
                 assertEquals(2L, toLong(r.getValue(CF, toBytes("a"))));
                 assertEquals(4L, toLong(r.getValue(CF, toBytes("b"))));
             }
             for (Result r : table.getScanner(scan)) {
-                ts.getInstant(r.getRow(), key);
+                ts.getStart(r.getRow(), key);
             }
         } finally {
             pool.putTable(table);
@@ -198,12 +186,12 @@ public class HbaseTimeSeriesTest {
     @Test
     public void testGet_2() throws IOException {
         String key = UUID.randomUUID().toString();
-        HBaseTimeSeries ts = new HBaseTimeSeries(configuration, pool, Aggregation.SECOND);
+        HBaseTimeSeries ts = new HBaseTimeSeries(configuration, pool, RowInterval.SECOND);
 
         HTableInterface table = pool.getTable(type);
         try {
             for (int i = 1000; i <= 100000; i += 1000) {
-                byte[] entryKey = ts.getRowKey(key, new Instant(i));
+                byte[] entryKey = ts.getRowKey(key, i);
                 Increment inc = new Increment(entryKey);
                 inc.addColumn(CF, Bytes.toBytes("a"), 1L);
                 inc.addColumn(CF, Bytes.toBytes("b"), 2L);
@@ -220,14 +208,16 @@ public class HbaseTimeSeriesTest {
         assertEquals(100, as.size());
         for (int i = 0; i < 100; i++) {
             DataPoint dp = as.get(i);
-            assertEquals((i + 1) * 1000, dp.getTimestamp());
+            assertEquals((i + 1) * 1000, dp.getStart());
+            assertEquals((i + 2) * 1000, dp.getEnd());
             assertEquals(1, dp.getValue());
         }
 
         assertEquals(100, bs.size());
         for (int i = 0; i < 100; i++) {
             DataPoint dp = bs.get(i);
-            assertEquals((i + 1) * 1000, dp.getTimestamp());
+            assertEquals((i + 1) * 1000, dp.getStart());
+            assertEquals((i + 2) * 1000, dp.getEnd());
             assertEquals(2, dp.getValue());
         }
     }

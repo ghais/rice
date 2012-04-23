@@ -1,130 +1,100 @@
-/**
- * (C) 2011 Digi-Net Technologies, Inc.
- * 4420 Northwest 36th Avenue
- * Gainesville, FL 32606 USA
- * All rights reserved.
- */
 package com.convert.rice;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.Map.Entry;
-import java.util.SortedMap;
+import java.util.List;
 
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.joda.time.Instant;
 import org.junit.Test;
 
-import com.convert.rice.protocol.Aggregation;
-
-/**
- * @author Ghais Issa <ghais.issa@convertglobal.com>
- * 
- */
 public class WritableDataPointsTest {
 
     private static final String KEY = "key";
 
     private static final String METRIC_NAME = "name";
 
-    /**
-     * Tests that when the datapoints are empty aggregation returns an empty map.
-     */
     @Test
-    public void testAggregate_1() {
-        WritableDataPoints dps = new WritableDataPoints(KEY, METRIC_NAME, new ArrayList<DataPoint>(0), 0, 0);
-        assertTrue(dps.aggregate(Aggregation.HOUR).isEmpty());
-        assertTrue(dps.aggregate(Aggregation.DAY).isEmpty());
-        assertTrue(dps.aggregate(Aggregation.MONTH).isEmpty());
-    }
+    public void testTimestamp_1() {
+        List<DataPoint> points = new ArrayList<DataPoint>() {
 
-    /**
-     * Test that when the datapoints are already aggregated to a certain format, re-aggregating them to the same unit
-     * has no effect.
-     */
-    @Test
-    public void testAggregate_2() {
-        final Instant instant1 = new DateTime(2012, 01, 01, 00, 00).toInstant();
-        final Instant instant2 = new DateTime(2012, 01, 02, 00, 00).toInstant();
-        final Instant instant3 = new DateTime(2012, 01, 03, 00, 00).toInstant();
-
-        ArrayList<DataPoint> dps = new ArrayList<DataPoint>(10) {
-
-            private static final long serialVersionUID = 6418821022217331787L;
+            private static final long serialVersionUID = 1L;
 
             {
-                add(new DataPoint(100, instant1.getMillis()));
-                add(new DataPoint(200, instant2.getMillis()));
-                add(new DataPoint(300, instant3.getMillis()));
+                add(new DataPoint(0, 1000, 0));
+                add(new DataPoint(500, 1000, 0));
 
+                add(new DataPoint(1000, 2000, 1));
+                add(new DataPoint(1500, 2000, 1));
+
+                add(new DataPoint(2000, 3000, 2));
+                add(new DataPoint(2500, 3000, 2));
+
+                add(new DataPoint(3000, 4000, 3));
+                add(new DataPoint(3500, 4000, 3));
+
+                add(new DataPoint(4000, 5000, 4));
+                add(new DataPoint(4500, 5000, 4));
+
+                add(new DataPoint(5000, 6000, 5));
+                add(new DataPoint(5500, 6000, 5));
+
+                add(new DataPoint(6000, 7000, 6));
+                add(new DataPoint(6500, 7000, 6));
+
+                add(new DataPoint(7000, 8000, 7));
+                add(new DataPoint(7500, 8000, 7));
+
+                add(new DataPoint(8000, 9000, 8));
+                add(new DataPoint(8500, 9000, 8));
+
+                add(new DataPoint(9000, 10000, 9));
+                add(new DataPoint(9500, 10000, 9));
+
+                add(new DataPoint(10000, 11000, 10));
+                add(new DataPoint(10500, 11000, 10));
             }
         };
-
-        // Add 1 to the end time stamp to make the last instant inclusive
-        SortedMap<Long, Long> result = new WritableDataPoints(KEY, METRIC_NAME, dps, instant1.getMillis(),
-                instant3.getMillis() + 1).aggregate(Aggregation.HOUR);
-        Iterator<Entry<Long, Long>> iterator = result.entrySet().iterator();
-        Instant current = instant1;
-        while (iterator.hasNext()) {
-            Entry<Long, Long> entry = iterator.next();
-            assertEquals(current.getMillis(), entry.getKey().longValue());
-            if (entry.getKey().longValue() == instant1.getMillis()) {
-                assertEquals(100, entry.getValue().longValue());
-            } else if (entry.getKey().longValue() == instant2.getMillis()) {
-                assertEquals(200, entry.getValue().longValue());
-            } else if (entry.getKey().longValue() == instant3.getMillis()) {
-                assertEquals(300, entry.getValue().longValue());
-            } else {
-                assertEquals(0L, entry.getValue().longValue());
-            }
-
-            current = current.plus(3600 * 1000);
-        }
+        DataPoints dataPoints = new WritableDataPoints(KEY, METRIC_NAME, points, 0, 10500);
+        assertEquals(0, dataPoints.timestamp(0));
+        assertEquals(500, dataPoints.timestamp(1));
+        assertEquals(1000, dataPoints.timestamp(2));
+        assertEquals(1500, dataPoints.timestamp(3));
+        assertEquals(2000, dataPoints.timestamp(4));
+        assertEquals(10000, dataPoints.timestamp(20));
+        assertEquals(10500, dataPoints.timestamp(21));
     }
 
-    /**
-     * Test that aggregating from hour to day works as expected.
-     */
-    @Test
-    public void testAggregate_3() {
-        final Instant instant1 = new DateTime(2012, 01, 01, 00, 00, DateTimeZone.UTC).toInstant();
-        final Instant instant2 = new DateTime(2012, 01, 01, 02, 01, DateTimeZone.UTC).toInstant();
-        final Instant instant3 = new DateTime(2012, 02, 03, 00, 00, DateTimeZone.UTC).toInstant();
-
-        ArrayList<DataPoint> dps = new ArrayList<DataPoint>(10) {
-
-            private static final long serialVersionUID = 6418821022217331787L;
-
-            {
-                add(new DataPoint(100, instant1.getMillis()));
-                add(new DataPoint(200, instant2.getMillis()));
-                add(new DataPoint(300, instant3.getMillis()));
-
-            }
-        };
-
-        // Add 1 to the end time stamp to make the last instant inclusive
-        SortedMap<Long, Long> result = new WritableDataPoints(KEY, METRIC_NAME, dps, instant1.getMillis(),
-                instant3.getMillis() + 1).aggregate(Aggregation.DAY);
-        Iterator<Entry<Long, Long>> iterator = result.entrySet().iterator();
-        Instant current = instant1;
-        while (iterator.hasNext()) {
-            Entry<Long, Long> entry = iterator.next();
-            assertEquals(current.getMillis(), entry.getKey().longValue());
-            if (entry.getKey().longValue() == instant1.getMillis()) {
-                // We aggregated instant1 and instant2
-                assertEquals(300, entry.getValue().longValue());
-            } else if (entry.getKey().longValue() == instant3.getMillis()) {
-                assertEquals(300, entry.getValue().longValue());
-            } else {
-                assertEquals(0L, entry.getValue().longValue());
-            }
-
-            current = current.plus(3600 * 1000 * 24);
-        }
+    @Test(expected = IllegalArgumentException.class)
+    public void testAdd_1() {
+        WritableDataPoints dataPoints = new WritableDataPoints(KEY, METRIC_NAME, 0, 10500);
+        dataPoints.add(new DataPoint(-1, Long.MAX_VALUE, 10));
     }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testAdd_2() {
+        WritableDataPoints dataPoints = new WritableDataPoints(KEY, METRIC_NAME, 0, 10500);
+        dataPoints.add(new DataPoint(1000, 10500, 10));
+        dataPoints.add(new DataPoint(0, 10500, 10));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testAdd_3() {
+        WritableDataPoints dataPoints = new WritableDataPoints(KEY, METRIC_NAME, 0, 10500);
+        dataPoints.add(new DataPoint(0, 1000, 10));
+        dataPoints.add(new DataPoint(1000, 2000, 10));
+        dataPoints.add(new DataPoint(0, 1000, 10));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testAdd_4() {
+        WritableDataPoints dataPoints = new WritableDataPoints(KEY, METRIC_NAME, 0, 10500);
+        dataPoints.add(new DataPoint(0, 100000, 10));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testAdd_5() {
+        WritableDataPoints dataPoints = new WritableDataPoints(KEY, METRIC_NAME, 0, 10500);
+        dataPoints.add(new DataPoint(100000, Long.MAX_VALUE, 10));
+    }
+
 }

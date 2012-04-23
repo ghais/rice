@@ -1,14 +1,8 @@
-/**
- * (C) 2011 Digi-Net Technologies, Inc.
- * 4420 Northwest 36th Avenue
- * Gainesville, FL 32606 USA
- * All rights reserved.
- */
 package com.convert.rice;
 
-import java.util.SortedMap;
+import java.util.List;
 
-import com.convert.rice.protocol.Aggregation;
+import com.google.common.base.Function;
 
 public interface DataPoints extends Iterable<DataPoint> {
 
@@ -79,16 +73,5 @@ public interface DataPoints extends Iterable<DataPoint> {
     @Override
     SeekableView iterator();
 
-    /**
-     * @return
-     */
-    String toJson();
-
-    /**
-     * Get the view as a sorted map based on the given aggregation.
-     * 
-     * @return map from timestamp to values aggregated according to the given aggregator.
-     */
-    SortedMap<Long, Long> aggregate(Aggregation agg);
-
+    DataPoints mapReduce(Function<DataPoints, List<DataPoints>> map, Function<DataPoints, DataPoint> reduce);
 }

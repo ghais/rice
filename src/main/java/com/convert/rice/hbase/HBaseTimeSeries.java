@@ -1,7 +1,5 @@
 package com.convert.rice.hbase;
 
-import static com.convert.rice.AggregationUtility.aggregateTo;
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Maps.newHashMap;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
@@ -26,12 +24,11 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.joda.time.Instant;
 import org.joda.time.Interval;
 
-import com.convert.rice.AggregationUtility;
 import com.convert.rice.DataPoint;
 import com.convert.rice.DataPoints;
+import com.convert.rice.RowInterval;
 import com.convert.rice.TimeSeries;
 import com.convert.rice.WritableDataPoints;
-import com.convert.rice.protocol.Aggregation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
@@ -49,7 +46,7 @@ public class HBaseTimeSeries implements TimeSeries {
 
     private final HTablePool pool;
 
-    private final Aggregation aggregation;
+    private final RowInterval rowInterval;
 
     private final boolean writeToWall;
 
@@ -59,15 +56,15 @@ public class HBaseTimeSeries implements TimeSeries {
      * @param hTable
      */
     public HBaseTimeSeries(Configuration configuration, HTablePool pool) {
-        this(configuration, pool, Aggregation.HOUR);
+        this(configuration, pool, RowInterval.MINUTE);
     }
 
-    public HBaseTimeSeries(Configuration conf, HTablePool pool, Aggregation aggregation) {
-        this(conf, pool, false, aggregation);
+    public HBaseTimeSeries(Configuration conf, HTablePool pool, RowInterval rowInterval) {
+        this(conf, pool, false, rowInterval);
     }
 
-    public HBaseTimeSeries(Configuration conf, HTablePool pool, boolean writeToWAL, Aggregation aggregation) {
-        this.aggregation = checkNotNull(aggregation);
+    public HBaseTimeSeries(Configuration conf, HTablePool pool, boolean writeToWAL, RowInterval rowInterval) {
+        this.rowInterval = checkNotNull(rowInterval);
         this.pool = checkNotNull(pool);
         this.conf = checkNotNull(conf);
         this.writeToWall = writeToWAL;
@@ -79,7 +76,7 @@ public class HBaseTimeSeries implements TimeSeries {
     }
 
     public void inc(String type, String key, Instant instant, Map<String, Long> dps) throws IOException {
-        Instant timeStamp = AggregationUtility.aggregateTo(instant, this.aggregation);
+        long timeStamp = rowInterval.getStart(instant.getMillis());
         byte[] entryKey = getRowKey(key, timeStamp);
 
         Increment inc = new Increment(entryKey);
@@ -105,10 +102,10 @@ public class HBaseTimeSeries implements TimeSeries {
     @Override
     public Map<String, DataPoints> get(String type, String key, Interval interval) throws IOException {
         ListMultimap<String, DataPoint> dps = ArrayListMultimap.<String, DataPoint> create();
-        Instant start = aggregateTo(interval.getStart().toInstant(), aggregation);
-        Instant end = interval.getEnd().toInstant();
-        byte[] startRow = getRowKey(key, start);
-        byte[] endRow = getRowKey(key, end);
+        long start = rowInterval.getStart(interval.getStartMillis());
+        long end = interval.getEndMillis();
+        byte[] startRow = getStartRowKey(key, start);
+        byte[] endRow = getEndRowKey(key, end);
         Scan scan = new Scan(startRow, endRow);
         scan.addFamily(CF);
         scan.setCaching(SCANNER_CACHING);
@@ -116,34 +113,45 @@ public class HBaseTimeSeries implements TimeSeries {
         HTableInterface hTable = pool.getTable(type);
         try {
             results = hTable.getScanner(scan);
-        } finally {
-            pool.putTable(hTable);
-        }
-        for (Result result : results) {
-            byte[] rowKey = result.getRow();
-            Instant instant = getInstant(rowKey, key);
-
-            for (KeyValue kv : result.list()) {
-                String metric = Bytes.toString(kv.getQualifier());
-                long value = Bytes.toLong(kv.getValue());
-                long timestamp = instant.getMillis();
-                if (timestamp >= start.getMillis() && timestamp < end.getMillis()) {
-                    dps.put(metric, new DataPoint(value, timestamp));
+            for (Result result : results) {
+                byte[] rowKey = result.getRow();
+                long timestamp = getStart(rowKey, key);
+                long dpEnd = getEnd(rowKey, key);
+                for (KeyValue kv : result.list()) {
+                    String metric = Bytes.toString(kv.getQualifier());
+                    long value = Bytes.toLong(kv.getValue());
+                    if (timestamp >= start && timestamp < end) {
+                        dps.put(metric, new DataPoint(timestamp, dpEnd, value));
+                    }
                 }
             }
+        } finally {
+            results.close();
+            pool.putTable(hTable);
         }
         Map<String, DataPoints> result = newHashMap();
         for (String metric : dps.keySet()) {
-            result.put(metric, new WritableDataPoints(key, metric, dps.get(metric), start.getMillis(), end.getMillis()));
+            result.put(metric, new WritableDataPoints(key, metric, dps.get(metric), start, end));
         }
         return result;
     }
 
     @VisibleForTesting
-    Instant getInstant(byte[] rowKey, String metricKey) {
-        checkArgument(rowKey.length == metricKey.length() + 1 + 8); // rowKey + : + timestamp.
+    long getStart(byte[] rowKey, String metricKey) {
         long millis = Bytes.toLong(Arrays.copyOfRange(rowKey, metricKey.length() + 1, rowKey.length));
-        return new Instant(millis);
+        return millis;
+    }
+
+    @VisibleForTesting
+    long getEnd(byte[] rowKey, String metricKey) {
+        if (rowKey.length == metricKey.length() + 18) {
+            long millis = Bytes.toLong(Arrays.copyOfRange(rowKey, metricKey.length() + 10, rowKey.length));
+            return millis;
+        } else {
+            // Support old keys for now.
+            return getStart(rowKey, metricKey) + this.rowInterval.getMillis();
+        }
+
     }
 
     /**
@@ -152,11 +160,39 @@ public class HBaseTimeSeries implements TimeSeries {
      * @return
      */
     @VisibleForTesting
-    byte[] getRowKey(String key, Instant instant) {
-        byte[] rowKey = new byte[key.length() + 1 + 8]; // key + : + timestamp
+    byte[] getStartRowKey(String key, long instant) {
+        byte[] rowKey = new byte[key.length() + 9]; // key + : + timestamp
         System.arraycopy(Bytes.toBytes(key), 0, rowKey, 0, key.length());
         rowKey[key.length()] = ':';
-        System.arraycopy(Bytes.toBytes(instant.getMillis()), 0, rowKey, key.length() + 1, 8);
+        System.arraycopy(Bytes.toBytes(instant), 0, rowKey, key.length() + 1, 8);
+        return rowKey;
+    }
+
+    /**
+     * Currently same as getStartRowKey
+     * 
+     * @param key
+     * @param instant
+     * @return
+     */
+    byte[] getEndRowKey(String key, long instant) {
+        return getStartRowKey(key, instant);
+    }
+
+    /**
+     * @param key
+     * @param instant
+     * @return
+     */
+    @VisibleForTesting
+    byte[] getRowKey(String key, long instant) {
+        byte[] rowKey = new byte[key.length() + 18]; // key + : + timestamp
+        System.arraycopy(Bytes.toBytes(key), 0, rowKey, 0, key.length());
+        rowKey[key.length()] = ':';
+        long end = instant + rowInterval.getMillis();
+        System.arraycopy(Bytes.toBytes(instant), 0, rowKey, key.length() + 1, 8);
+        rowKey[key.length() + 9] = ':';
+        System.arraycopy(Bytes.toBytes(end), 0, rowKey, key.length() + 10, 8);
         return rowKey;
     }
 

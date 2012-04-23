@@ -2,7 +2,6 @@ package com.convert.rice;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.Arrays.asList;
-import static org.apache.commons.lang.StringUtils.equalsIgnoreCase;
 
 import java.io.IOException;
 
@@ -14,7 +13,6 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.client.HTablePool;
 
 import com.convert.rice.hbase.HBaseTimeSeries;
-import com.convert.rice.protocol.Aggregation;
 import com.convert.rice.server.protobuf.RiceProtoBufRpcServer;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
@@ -61,10 +59,9 @@ public class Main {
         HTablePool pool = new HTablePool(conf, Integer.MAX_VALUE);
         Boolean writeToWAL = (Boolean) options.valueOf("hbase.writeToWAL");
 
-        Aggregation precision = equalsIgnoreCase("s", (String) options.valueOf("minInterval")) ? Aggregation.SECOND :
-                equalsIgnoreCase((String) options.valueOf("minInterval"), "m") ? Aggregation.MINUTE :
-                        Aggregation.HOUR;
-        HBaseTimeSeriesSupplier hbaseTimeSeriesSupplier = new HBaseTimeSeriesSupplier(conf, pool, writeToWAL, precision);
+        RowInterval rowInterval = RowInterval.fromString((String) options.valueOf("minInterval"));
+        HBaseTimeSeriesSupplier hbaseTimeSeriesSupplier = new HBaseTimeSeriesSupplier(conf, pool, writeToWAL,
+                rowInterval);
         Supplier<TimeSeries> supplier = Suppliers.memoize(hbaseTimeSeriesSupplier);
 
         new RiceProtoBufRpcServer((Integer) options.valueOf("port"), supplier).start();
@@ -79,18 +76,18 @@ public class Main {
 
         private final boolean writeToWAL;
 
-        private final Aggregation aggregation;
+        private final RowInterval rowInterval;
 
-        public HBaseTimeSeriesSupplier(Configuration conf, HTablePool pool, boolean writeToWAL, Aggregation aggregation) {
+        public HBaseTimeSeriesSupplier(Configuration conf, HTablePool pool, boolean writeToWAL, RowInterval interval) {
             this.conf = checkNotNull(conf);
             this.pool = checkNotNull(pool);
             this.writeToWAL = writeToWAL;
-            this.aggregation = checkNotNull(aggregation);
+            this.rowInterval = checkNotNull(interval);
         }
 
         @Override
         public TimeSeries get() {
-            return new HBaseTimeSeries(conf, pool, writeToWAL, aggregation);
+            return new HBaseTimeSeries(conf, pool, writeToWAL, rowInterval);
         }
     }
 
