@@ -65,7 +65,7 @@ public class HbaseTimeSeriesTest {
     }
 
     @AfterClass
-    public static void after() throws IOException {
+    public static void after() throws Exception {
         new HBaseTimeSeries(configuration, pool).deleteTable(admin, type);
         pool.close();
         testUtil.shutdownMiniCluster();
