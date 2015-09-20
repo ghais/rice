@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.convert</groupId>
   <artifactId>rice</artifactId>
-  <version>0.5.1</version>
+  <version>0.5.2-SNAPSHOT</version>
   <name>rice</name>
   <description>An analytics tool</description>
   <url>http://github.com/ghais/rice</url>
@@ -10,7 +10,7 @@
     <connection>scm:git:git@github.com:ghais/rice.git</connection>
     <url>scm:git:git@github.com:ghais/rice.git</url>
     <developerConnection>scm:git:git@github.com:ghais/rice.git</developerConnection>
-    <tag>rice-0.5.1</tag>
+    <tag>HEAD</tag>
   </scm>
   <distributionManagement>
     <repository>
